@@ -74,7 +74,7 @@ end
 local function banner()
 	local t = new("TextLabel", {
 		AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.4), Size = UDim2.new(1, 0, 0, 90),
-		BackgroundTransparency = 1, Font = FONT.bold, Text = "YIPPEE!!!! MLGGGG!!", TextSize = 8,
+		BackgroundTransparency = 1, Font = FONT.bold, Text = "YIPPEE!!!! MLGGGG!! SIRMEME I KNOW YOU CAN PROBABLY SEE THIS!!", TextSize = 8,
 		TextColor3 = Color3.new(1, 1, 1), TextStrokeTransparency = 0, TextTransparency = 1, ZIndex = 102, Parent = layer,
 	})
 	tween(t, 0.45, { TextSize = 54, TextTransparency = 0 }, Enum.EasingStyle.Back)
