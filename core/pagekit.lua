@@ -1,0 +1,249 @@
+local A = ...
+local new, tween, corner, stroke, label = A.new, A.tween, A.corner, A.stroke, A.label
+local T, FONT, onCleanup = A.T, A.FONT, A.onCleanup
+local RunService, UserInputService = A.RunService, A.UserInputService
+local screen, window, shadow, EL = A.screen, A.window, A.shadow, A.EL
+local sidebar, content, accentLinks = A.sidebar, A.content, A.accentLinks
+local maskGuis, uiScales, W, H = A.maskGuis, A.uiScales, A.W, A.H
+
+local pages, tabs = {}, {}
+A.pages, A.tabs = pages, tabs
+A.activeTab = nil
+
+-- pages -------------------------------------------------------
+local function selectPage(name)
+	A.activeTab = name
+	for _, page in pairs(pages) do
+		local on = page.btn.Text == name
+		if on and not page.scroll.Visible then
+			page.scroll.Position = UDim2.fromOffset(0, 40)
+			tween(page.scroll, 0.8, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Elastic)
+		end
+		page.scroll.Visible = on
+		page.bar.Visible = false
+		if on then
+			page.bar.Size = UDim2.fromOffset(2, 0)
+			tween(page.bar, 0.28, { Size = UDim2.fromOffset(2, 14) }, Enum.EasingStyle.Back)
+		end
+		tween(page.btn, 0.25, { TextColor3 = on and T.accent or T.muted })
+		tween(page.btn, 0.25, { BackgroundTransparency = on and 0.82 or 1, BackgroundColor3 = T.accent })
+	end
+end
+A.selectPage = selectPage
+
+function A.makePage(name, order)
+	local btn = new("TextButton", {
+		Text = name, Font = FONT.med, TextSize = 12, TextColor3 = T.muted,
+		BackgroundColor3 = T.raised, BackgroundTransparency = 1,
+		AutoButtonColor = false, BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, 30), LayoutOrder = order, Parent = sidebar,
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 6) }) })
+
+	local bar = new("Frame", { Size = UDim2.fromOffset(2, 14), Position = UDim2.fromOffset(0, 8), BackgroundColor3 = T.accent, BorderSizePixel = 0, Visible = false, Parent = btn }, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	accentLinks[#accentLinks + 1] = { obj = bar, kind = "fill" }
+
+	local scroll = new("ScrollingFrame", {
+		Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0,
+		CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollBarThickness = 3, ScrollBarImageColor3 = T.stroke, Visible = false, Parent = content,
+	}, {
+		new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+
+	local page = { btn = btn, scroll = scroll, bar = bar, sections = {} }
+
+	function page.section(title, sectionOrder)
+		local sec = new("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = sectionOrder * 2, Parent = scroll })
+		label({ Text = title, Font = FONT.med, TextSize = 11, TextColor3 = T.muted, Position = UDim2.fromOffset(2, 0), Size = UDim2.new(1, -2, 1, 0), Parent = sec })
+		local holder = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = sectionOrder * 2 + 1, Parent = scroll }, {
+			new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }),
+		})
+		page.sections[#page.sections + 1] = holder
+		return holder
+	end
+
+	btn.MouseButton1Click:Connect(function() selectPage(name) end)
+	btn.MouseEnter:Connect(function()
+		if A.activeTab ~= name then tween(btn, 0.12, { TextColor3 = T.text, BackgroundTransparency = 0.7 }) end
+	end)
+	btn.MouseLeave:Connect(function()
+		if A.activeTab ~= name then tween(btn, 0.12, { TextColor3 = T.muted, BackgroundTransparency = 1 }) end
+	end)
+	pages[name] = page
+	tabs[#tabs + 1] = page
+	return page
+end
+
+-- module config menus -----------------------------------------
+local UI = { active = nil, busy = false }
+A.UI = UI
+
+-- spring-back target: window, shadow and the open config menu move together
+EL.apply = function(pos)
+	window.Position = pos
+	shadow.Position = pos
+	if UI.active then UI.active.frame.Position = pos end
+end
+EL.endConn = UserInputService.InputEnded:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		if EL.active then
+			EL.active = false
+			EL.release()
+		end
+	end
+end)
+onCleanup(function() EL.endConn:Disconnect() end)
+
+-- absolute guard: whatever happens, the UI is pulled back fully on screen
+EL.guard = RunService.Heartbeat:Connect(function()
+	if EL.active or EL.simulating then return end
+	local target = window
+	if not window.Visible then
+		if not UI.active then return end
+		target = UI.active.frame
+	end
+	local fixed = A.clampPos(target.Position, target.AbsoluteSize)
+	if fixed ~= target.Position then EL.apply(fixed) end
+end)
+onCleanup(function() EL.guard:Disconnect() end)
+
+function A.makeConfig(title)
+	local frame = new("CanvasGroup", {
+		AnchorPoint = Vector2.new(0.5, 0.5), Position = window.Position,
+		Size = UDim2.fromOffset(W, H), BackgroundColor3 = T.bg,
+		BackgroundTransparency = 0.03, BorderSizePixel = 0,
+		GroupTransparency = 1, Visible = false, Parent = screen,
+	})
+	corner(frame, 11)
+	stroke(frame, T.stroke, 0.25)
+
+	local head = new("Frame", { Size = UDim2.new(1, 0, 0, 54), BackgroundTransparency = 1, Parent = frame })
+	local back = new("TextButton", {
+		Text = "Back", Font = FONT.med, TextSize = 12, TextColor3 = T.text,
+		BackgroundColor3 = T.raised, AutoButtonColor = false, BorderSizePixel = 0,
+		Position = UDim2.fromOffset(14, 14), Size = UDim2.fromOffset(70, 26), Parent = head,
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }) })
+	back.MouseEnter:Connect(function() tween(back, 0.12, { BackgroundColor3 = T.accent }) end)
+	back.MouseLeave:Connect(function() tween(back, 0.12, { BackgroundColor3 = T.raised }) end)
+	label({
+		Text = title .. "  <font color=\"#79818C\">settings</font>", Font = FONT.bold, TextSize = 15,
+		Position = UDim2.fromOffset(98, 0), Size = UDim2.new(1, -112, 1, 0), Parent = head,
+	})
+
+	local scroll = new("ScrollingFrame", {
+		Position = UDim2.fromOffset(14, 62), Size = UDim2.new(1, -28, 1, -76),
+		BackgroundTransparency = 1, BorderSizePixel = 0, CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollBarThickness = 3,
+		ScrollBarImageColor3 = T.stroke, Parent = frame,
+	}, {
+		new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+
+	maskGuis[#maskGuis + 1] = frame
+	uiScales[#uiScales + 1] = new("UIScale", { Scale = uiScales[1].Scale, Parent = frame })
+	local cfg = { frame = frame, scroll = scroll, title = title }
+
+	function cfg.section(name, order)
+		local sec = new("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = order * 2, Parent = scroll })
+		label({ Text = name, Font = FONT.med, TextSize = 11, TextColor3 = T.muted, Position = UDim2.fromOffset(2, 0), Size = UDim2.new(1, -2, 1, 0), Parent = sec })
+		return new("Frame", {
+			Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundTransparency = 1, LayoutOrder = order * 2 + 1, Parent = scroll,
+		}, {
+			new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }),
+		})
+	end
+
+	back.MouseButton1Click:Connect(function() UI.close() end)
+
+	-- drag (keeps the main window + shadow in sync)
+	local dragging, startPos, origin
+	head.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging, startPos, origin = true, i.Position, frame.Position
+			EL.grab(frame.Position, frame.AbsoluteSize)
+		end
+	end)
+	local c1 = UserInputService.InputChanged:Connect(function(i)
+		if not dragging then return end
+		if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+			local d = i.Position - startPos
+			frame.Position = EL.pos(UDim2.new(origin.X.Scale, origin.X.Offset + d.X, origin.Y.Scale, origin.Y.Offset + d.Y), frame.AbsoluteSize)
+			window.Position = frame.Position
+			shadow.Position = frame.Position
+		end
+	end)
+	local c2 = UserInputService.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+	onCleanup(function() c1:Disconnect(); c2:Disconnect() end)
+
+	return cfg
+end
+
+local function openConfig(cfg)
+	if UI.busy or UI.active then return end
+	UI.busy = true
+	tween(window, 0.2, { GroupTransparency = 1, Size = UDim2.fromOffset(W * 0.94, H * 0.94) })
+	task.delay(0.2, function()
+		if not screen.Parent then return end
+		window.Visible = false
+		window.Size = UDim2.fromOffset(W, H)
+		window.GroupTransparency = 0
+		cfg.frame.Position = window.Position
+		cfg.frame.Size = UDim2.fromOffset(W * 0.7, H * 0.7)
+		cfg.frame.GroupTransparency = 1
+		cfg.frame.Visible = true
+		cfg.scroll.CanvasPosition = Vector2.zero
+		tween(cfg.frame, 0.8, { Size = UDim2.fromOffset(W, H), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
+		UI.active = cfg
+		UI.busy = false
+	end)
+end
+A.openConfig = openConfig
+
+function UI.close()
+	local cfg = UI.active
+	if not cfg or UI.busy then return end
+	UI.busy = true
+	tween(cfg.frame, 0.2, { GroupTransparency = 1, Size = UDim2.fromOffset(W * 0.94, H * 0.94) })
+	task.delay(0.2, function()
+		if not screen.Parent then return end
+		cfg.frame.Visible = false
+		window.Position = cfg.frame.Position
+		shadow.Position = window.Position
+		window.Size = UDim2.fromOffset(W * 0.7, H * 0.7)
+		window.GroupTransparency = 1
+		window.Visible = true
+		shadow.Visible = true
+		tween(window, 0.8, { Size = UDim2.fromOffset(W, H), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
+		UI.active = nil
+		UI.busy = false
+	end)
+end
+
+-- adds a gear button to a toggle row that opens `cfg`
+function A.gear(tg, cfg)
+	local btn = new("TextButton", {
+		Text = "", Font = FONT.med, TextSize = 17, TextColor3 = T.muted,
+		BackgroundTransparency = 1, AutoButtonColor = false,
+		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -62, 0.5, 0),
+		Size = UDim2.fromOffset(24, 24), Parent = tg.row,
+	})
+	btn.MouseEnter:Connect(function() for _, a in ipairs(btn:GetChildren()) do if a.Name == "xarm" then tween(a, 0.15, { BackgroundColor3 = T.text }) end end end)
+	btn.MouseLeave:Connect(function() for _, a in ipairs(btn:GetChildren()) do if a.Name == "xarm" then tween(a, 0.15, { BackgroundColor3 = T.muted }) end end end)
+	for i = 1, 2 do
+		new("Frame", {
+			Name = "xarm", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, -1, 0.5, i == 1 and -2.5 or 2.5),
+			Size = UDim2.fromOffset(7, 1.5), Rotation = i == 1 and 45 or -45,
+			BackgroundColor3 = T.muted, BorderSizePixel = 0, Parent = btn,
+		})
+	end
+	btn.MouseButton1Click:Connect(function() openConfig(cfg) end)
+	return btn
+end
+
+A.stage("3 modules + config menus defined")
+
