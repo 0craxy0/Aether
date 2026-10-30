@@ -3,7 +3,7 @@
 - uhh basically just a really good script
 - ton of features
 - more coming soon
-
+```
 Aether/
 ├── main.lua                  loader (the only file users run)
 ├── core/
@@ -37,3 +37,4 @@ Aether/
     ├── glass.lua             glass blur and Liquid Glass
     ├── keybinds.lua          ⏳ search box and the RightShift handler
     └── startup.lua           ⏳ unload, shadow layers, Apple skin, intro
+```
