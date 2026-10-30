@@ -25,7 +25,14 @@ local FILES = {
 	"pages/movement.lua",
 	"pages/visuals.lua",
 	"pages/combat.lua",
-	-- tail/*.lua (players, UI, settings, keybinds, glass, startup) go here once written
+	"pages/players.lua",
+	"tail/keylist.lua",   -- before pages/ui (it creates A.kbList)
+	"pages/ui.lua",       -- creates A.sUI4 for the files below
+	"tail/extras.lua",
+	"tail/glass.lua",
+	"tail/settings.lua",
+	"tail/keybinds.lua",
+	"tail/startup.lua",
 }
 
 local A = { base = BASE }
@@ -47,4 +54,3 @@ for _, path in ipairs(FILES) do
 		return warn("[Aether] error in " .. path .. ": " .. tostring(runErr))
 	end
 end
-
