@@ -287,4 +287,3 @@ function SA.start()
 	return true
 end
 onCleanup(SA.stop)
-
