@@ -1,8 +1,4 @@
---[[ AETHER · loader
-     Runs every file in order. Each file receives the shared table A as `...`
-     and stores what it builds on A for the files after it. ]]
 
--- PLACEHOLDER: replace with your repo's raw URL (keep the trailing slash)
 local BASE = "https://raw.githubusercontent.com/0craxy0/Aether/main/"
 
 local FILES = {
