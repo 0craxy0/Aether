@@ -4,7 +4,8 @@ local LP, Players, RunService, UserInputService = A.LP, A.Players, A.RunService,
 local uiHitCircle, uiHitSeg, uiHitBox = A.uiHitCircle, A.uiHitSeg, A.uiHitBox
 
 local Aim = {
-	conn = nil, target = nil, rand = 1, lastShot = 0, warnedTrigger = false,
+	conn = nil, bound = false, target = nil, rand = 1, lastShot = 0, warnedTrigger = false,
+	acquiredAt = 0,
 	s = {
 		fov = 150, showFov = true, fovFilled = false,
 		smooth = 30, method = "Camera", part = "Head",
@@ -22,6 +23,9 @@ A.AIM_PARTS = AIM_PARTS
 
 local aimParams = RaycastParams.new()
 aimParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- bound by name so the step can be unbound on stop; see Aim.start
+local RENDER_NAME = "AetherAim"
 
 local function aimKeyHeld()
 	local k = Aim.s.aimKey
@@ -88,6 +92,10 @@ local function aimEvaluate(plr, cam, mouse, ignoreFov)
 end
 
 function Aim.stop()
+	if Aim.bound then
+		pcall(function() RunService:UnbindFromRenderStep(RENDER_NAME) end)
+		Aim.bound = false
+	end
 	if Aim.conn then Aim.conn:Disconnect(); Aim.conn = nil end
 	for _, k in ipairs({ "circle", "line", "text" }) do
 		if Aim[k] then pcall(function() Aim[k]:Remove() end); Aim[k] = nil end
@@ -96,7 +104,7 @@ function Aim.stop()
 end
 
 function Aim.start()
-	if Aim.conn then return end
+	if Aim.conn or Aim.bound then return end
 	if has.drawing then
 		Aim.circle = Drawing.new("Circle")
 		Aim.circle.NumSides = 64
@@ -111,13 +119,16 @@ function Aim.start()
 		Aim.text.Color = Color3.new(1, 1, 1)
 	end
 
-	Aim.conn = RunService.RenderStepped:Connect(function(dt)
+	local function step(dt)
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		local s = Aim.s
 		local m = UserInputService:GetMouseLocation()
 
-		-- find target
+		-- Acquisition runs on every frame the key is down, never only on the press:
+		-- a target that becomes reachable mid-hold is picked up on the frame it
+		-- becomes reachable, and one that dies or leaves the FOV is replaced by the
+		-- next best candidate on that same frame.
 		local held = aimKeyHeld()
 		local newT
 		if held then
@@ -133,7 +144,11 @@ function Aim.start()
 				end
 			end
 		end
-		if newT and (not Aim.target or Aim.target.plr ~= newT.plr) then Aim.rand = math.random(1, 4) end
+		local previous = Aim.target and Aim.target.plr
+		if newT and newT.plr ~= previous then
+			Aim.rand = math.random(1, 4)
+			Aim.acquiredAt = os.clock() -- fresh target: close the gap now, smooth after
+		end
 		Aim.target = newT
 
 		-- aim
@@ -145,6 +160,11 @@ function Aim.start()
 			if delta.Magnitude > s.deadzone then
 				local alpha = 1 - (s.smooth / 100) ^ (math.max(dt, 1 / 240) * 60)
 				alpha = math.clamp(alpha, 0.01, 1)
+				-- a new target is snapped at rather than eased at, so the lock lands on
+				-- the frame it becomes available instead of drifting in
+				if os.clock() - (Aim.acquiredAt or 0) < 0.15 then
+					alpha = math.clamp(alpha * 2.5, 0.01, 1)
+				end
 				if s.method == "Mouse" and mousemoverel then
 					mousemoverel(delta.X * alpha, delta.Y * alpha)
 				else
@@ -196,7 +216,18 @@ function Aim.start()
 				Aim.text.Text = string.format("%s  [%dm]  %d hp", newT.plr.Name, math.floor(newT.dist), math.floor(newT.hum.Health))
 			end
 		end
+	end
+
+	-- Bound one step *after* the default camera. A plain RenderStepped write is
+	-- overwritten by the camera module later in the same frame, which is why the
+	-- aim only ever appeared to lock when the target was already under the
+	-- crosshair and the leftover correction was under the deadzone.
+	local bound = pcall(function()
+		RunService:UnbindFromRenderStep(RENDER_NAME)
+		RunService:BindToRenderStep(RENDER_NAME, Enum.RenderPriority.Camera.Value + 1, step)
 	end)
+	Aim.bound = bound
+	if not bound then Aim.conn = RunService.RenderStepped:Connect(step) end
 end
 onCleanup(Aim.stop)
 
