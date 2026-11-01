@@ -24,6 +24,13 @@ local function rsApplySize(nw, nh)
 	A.W, A.H = nw / sc, nh / sc
 	window.Size = UDim2.fromOffset(A.W, A.H)
 	shadow.Size = UDim2.fromOffset(RS.vw + 44, RS.vh + 44)
+	-- the window's corners scale with the contents, so the shadow's curve has to follow
+	local sCorner = shadow:FindFirstChildOfClass("UICorner")
+	if sCorner then
+		local base = A.windowCorner or 19
+		local pad = A.shadowPad or 22
+		sCorner.CornerRadius = UDim.new(0, math.floor(base * sc + pad))
+	end
 end
 A.RS, A.rsApplySize = RS, rsApplySize
 

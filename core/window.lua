@@ -6,12 +6,15 @@ local UserInputService = A.UserInputService
 local W, H = 580, 430
 A.W, A.H = W, H
 
+-- how far the shadow extends past the window on every side
+local PAD = 22
+
 local shadow = new("ImageLabel", {
 	Image = "rbxassetid://1316045217", ScaleType = Enum.ScaleType.Slice,
 	SliceCenter = Rect.new(20, 20, 80, 80), ImageColor3 = Color3.new(0, 0, 0),
 	ImageTransparency = 0.5, BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.fromOffset(W + 44, H + 44), Parent = screen,
+	Size = UDim2.fromOffset(W + PAD * 2, H + PAD * 2), Parent = screen,
 })
 
 local window = new("CanvasGroup", {
@@ -21,6 +24,14 @@ local window = new("CanvasGroup", {
 })
 corner(window, 11)
 stroke(window, Color3.new(1, 1, 1), 0.86)
+
+-- The shadow sits PAD outside the window, so its curve has to be the window's radius
+-- plus that inset to look concentric. Matching the number exactly would pinch the
+-- halo at the corners. Recomputed on rescale in pages/ui.lua; the window is untouched.
+local wCorner = window:FindFirstChildOfClass("UICorner")
+A.windowCorner = wCorner and wCorner.CornerRadius.Offset or 19
+A.shadowPad = PAD
+new("UICorner", { CornerRadius = UDim.new(0, A.windowCorner + PAD), Parent = shadow })
 new("Frame", { Name = "sheen", Size = UDim2.fromScale(1, 0.45), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Active = false, Parent = window }, {
 	new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.9), NumberSequenceKeypoint.new(1, 1) }) }),
 })
