@@ -394,13 +394,11 @@ function A.colorPicker(parent, name, default, onChanged)
 	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }), new("UIStroke", { Color = Color3.new(1, 1, 1), Thickness = 2, Transparency = 0.1 }) })
 
 	-- brightness bar
-	local bar = new("Frame", { Size = UDim2.new(1, 0, 0, 14), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, LayoutOrder = 3, Parent = pad }, {
+	local bar = new("Frame", { Size = UDim2.new(1, 0, 0, 14), BorderSizePixel = 0, LayoutOrder = 3, Parent = pad }, {
 		new("UICorner", { CornerRadius = UDim.new(1, 0) }),
-		-- black to white is a ColorSequence, not a NumberSequence: only
-		-- ColorSequenceKeypoint takes a Color3, NumberSequenceKeypoint takes numbers
-		new("UIGradient", { Rotation = 0, Color = ColorSequence.new({
-			ColorSequenceKeypoint.new(0, Color3.new(0, 0, 0)),
-			ColorSequenceKeypoint.new(1, Color3.new(1, 1, 1)),
+		new("UIGradient", { Rotation = 0, Color = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, Color3.new(0, 0, 0)),
+			NumberSequenceKeypoint.new(1, Color3.new(1, 1, 1)),
 		}) }),
 	})
 	local barKnob = new("Frame", {
