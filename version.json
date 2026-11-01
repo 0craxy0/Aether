@@ -1,0 +1,6 @@
+{
+  "rev": 9,
+  "build": "2026-11-01.9",
+  "notes": "Update check, aim step runs after the camera, shadow and corner fixes.",
+  "loader": "main.lua"
+}

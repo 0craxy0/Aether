@@ -23,9 +23,33 @@ The panel is built to behave like an object, not a picture:
 - **voice** - one short blip for the whole interface, pitched per intent
 
 All four are switchable on the UI page, and none of them touch a module's state.
+
+## updating
+
+`tail/updater.lua` reads `version.json` every 15s (Settings > Updates) and compares
+its `rev` with the `rev` compiled into the running loader. On a newer rev it asks
+once, saying plainly that the configuration will be saved and restored, then:
+
+1. writes the config to `Aether/config.json`
+2. unloads through `_G.AetherUnload`, exactly like the Unload button
+3. downloads and runs `main.lua` again, which replays the config on the way up
+
+If the config cannot be written the update is cancelled rather than silently
+dropping it. After one detection the device goes quiet for five minutes, and a
+rev the user declined is not asked about again (Check now resets that).
+
+Releasing means bumping `REV` in `main.lua` and `rev` in `version.json`
+together - the updater warns in the console if the file falls behind the loader,
+because in that state nobody can be offered the next build.
+
+No server is needed: `version.json` is a 4-line file on the CDN the script already
+trusts. `A.updater.api` can point at a POST endpoint instead - it receives
+`{rev, build}` in the body and answers with the same JSON shape - but a per-device
+POST every few seconds costs money at scale and buys nothing over a static file.
 ```
 Aether/
 ├── main.lua                  loader (the only file users run)
+├── version.json              rev + notes the update check polls
 ├── core/
 │   ├── env.lua               services, executor checks, cleanup list
 │   ├── theme.lua             colours and fonts
@@ -59,5 +83,6 @@ Aether/
     ├── glass.lua             glass blur and Liquid Glass
     ├── settings.lua          accent colour, config save/load, session actions
     ├── keybinds.lua          key handlers and the Keybinds page
+    ├── updater.lua           update check, prompt, restart
     └── startup.lua           show/hide, search, startup animation
 ```

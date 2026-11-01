@@ -32,11 +32,14 @@ local FILES = {
 	"tail/settings.lua",
 	"tail/keybinds.lua",
 	"tail/startup.lua",
+	"tail/updater.lua",
 }
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-01.8"
+local BUILD = "2026-11-01.9"
+-- monotonic: the updater compares rev, never the date string
+local REV = 9
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -47,7 +50,7 @@ local function url(path)
 	return BASE .. path
 end
 
-local A = { base = BASE, build = BUILD }
+local A = { base = BASE, build = BUILD, rev = REV }
 
 -- lets auto-execute on teleport re-run this loader
 getgenv().AetherSource = BASE .. "main.lua"

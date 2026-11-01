@@ -64,6 +64,7 @@ end
 
 -- page ------------------------------------------------------------
 local pSet = A.makePage("Settings", 8)
+A.pageSettings = pSet -- tail/updater.lua adds the Update section to it
 
 local sLook = pSet.section("Appearance", 1)
 dropdown(sLook, "Accent color", ACCENT_NAMES, "Blue", function(v)
