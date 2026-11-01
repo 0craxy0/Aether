@@ -31,8 +31,8 @@ local header = new("Frame", {
 
 label({ Text = "Aether", Font = FONT.bold, TextSize = 18, Position = UDim2.fromOffset(18, 11), Size = UDim2.fromOffset(140, 22), Parent = header })
 label({
-	Text = string.format("<font color=\"#79818C\">%s</font>  ·  <font color=\"#79818C\">%s</font>", A.executorName, LP.Name),
-	TextSize = 11, Position = UDim2.fromOffset(18, 31), Size = UDim2.fromOffset(300, 14), Parent = header,
+	Text = string.format("<font color=\"#79818C\">%s</font>  ·  <font color=\"#79818C\">%s</font>  ·  <font color=\"#79818C\">%s</font>", A.executorName, LP.Name, tostring(A.build or "?")),
+	TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(18, 31), Size = UDim2.fromOffset(430, 14), Parent = header,
 })
 
 local closeBtn = new("TextButton", {

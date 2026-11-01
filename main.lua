@@ -34,10 +34,24 @@ local FILES = {
 	"tail/startup.lua",
 }
 
-local A = { base = BASE }
+-- bumped whenever a push changes behaviour. Printed on load and shown in the
+-- window header, so "am I on the new build?" is a fact instead of a guess.
+local BUILD = "2026-11-01.4"
+
+-- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
+-- executing and every file is fetched with a unique URL, bypassing every cache
+local FRESH = getgenv and getgenv().AetherFresh == true
+
+local function url(path)
+	if FRESH then return BASE .. path .. "?t=" .. tostring(os.time()) end
+	return BASE .. path
+end
+
+local A = { base = BASE, build = BUILD }
 
 -- lets auto-execute on teleport re-run this loader
 getgenv().AetherSource = BASE .. "main.lua"
+print("[Aether] build " .. BUILD .. (FRESH and " (fresh fetch)" or ""))
 
 -- a half-loaded hub is worse than none: warn once, then tear down whatever was built
 -- so the ScreenGui from core/notify.lua cannot outlive the load that made it
@@ -47,7 +61,7 @@ local function fail(msg)
 end
 
 for _, path in ipairs(FILES) do
-	local okGet, src = pcall(game.HttpGet, game, BASE .. path)
+	local okGet, src = pcall(game.HttpGet, game, url(path))
 	if not okGet then
 		return fail("could not download " .. path .. ": " .. tostring(src))
 	end
