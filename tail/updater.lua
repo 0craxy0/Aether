@@ -18,7 +18,7 @@ local U = {
 	dialog = nil,
 	dismissed = {}, -- revs the user said "not now" to: stay quiet, keep checking
 	json = "version.json",
-	api = nil, -- optional POST endpoint; when nil we read the version file directly
+	api = "https://aether-version.mariavictorlennySingh.workers.dev",
 }
 A.updater = U
 
