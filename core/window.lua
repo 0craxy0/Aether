@@ -9,10 +9,15 @@ A.W, A.H = W, H
 -- how far the shadow extends past the window on every side
 local PAD = 22
 
+-- One image stretched across the whole shadow, then shaped by a single UICorner.
+-- It was 9-sliced before, which kept the sprite's corners at native size (~20px)
+-- while the corner below cuts a much larger arc - the clip sliced through the
+-- sprite's solid core and left a hard edge. Stretched, the alpha ramps across the
+-- whole face, so the clip can only ever remove pixels that are already near clear.
 local shadow = new("ImageLabel", {
-	Image = "rbxassetid://1316045217", ScaleType = Enum.ScaleType.Slice,
-	SliceCenter = Rect.new(20, 20, 80, 80), ImageColor3 = Color3.new(0, 0, 0),
-	ImageTransparency = 0.5, BackgroundTransparency = 1,
+	Image = "rbxassetid://1316045217", ScaleType = Enum.ScaleType.Stretch,
+	ImageColor3 = Color3.new(0, 0, 0),
+	ImageTransparency = 0.4, BackgroundTransparency = 1,
 	AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
 	Size = UDim2.fromOffset(W + PAD * 2, H + PAD * 2), Parent = screen,
 })
@@ -25,9 +30,9 @@ local window = new("CanvasGroup", {
 corner(window, 11)
 stroke(window, Color3.new(1, 1, 1), 0.86)
 
--- The shadow sits PAD outside the window, so its curve has to be the window's radius
--- plus that inset to look concentric. Matching the number exactly would pinch the
--- halo at the corners. Recomputed on rescale in pages/ui.lua; the window is untouched.
+-- The shadow sits PAD outside the window, so its curve is the window's radius plus
+-- that inset, which keeps the two arcs concentric. Recomputed on rescale in
+-- pages/ui.lua. The window's own corner is untouched.
 local wCorner = window:FindFirstChildOfClass("UICorner")
 A.windowCorner = wCorner and wCorner.CornerRadius.Offset or 19
 A.shadowPad = PAD

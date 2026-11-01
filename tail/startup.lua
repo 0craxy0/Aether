@@ -3,6 +3,7 @@ local tween, notify, sfx = A.tween, A.notify, A.sfx
 local window, shadow, UI = A.window, A.shadow, A.UI
 local closeBtn, searchBox = A.closeBtn, A.searchBox
 local keybinds = A.keybinds
+local shadowAlpha = shadow.ImageTransparency -- restore what core/window.lua chose
 
 -- show / hide ----------------------------------------------------
 local hidden = false
@@ -39,7 +40,7 @@ function A.toggleUI()
 		target.Visible = true
 		shadow.Visible = true
 		tween(target, 0.8, { Size = full, GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
-		tween(shadow, 0.3, { ImageTransparency = 0.5 })
+		tween(shadow, 0.3, { ImageTransparency = shadowAlpha })
 	end
 end
 
