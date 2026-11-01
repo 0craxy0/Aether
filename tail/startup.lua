@@ -75,11 +75,8 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 end)
 
 -- unload ---------------------------------------------------------
-_G.AetherUnload = function()
-	for i = #A.cleanup, 1, -1 do pcall(A.cleanup[i]) end
-	pcall(function() A.screen:Destroy() end)
-	_G.AetherUnload = nil
-end
+-- core/env.lua registers A.unload before the first file runs (so a failed load can
+-- roll back), which is what the settings page and _G.AetherUnload both use.
 
 -- go -------------------------------------------------------------
 A.selectPage("Character")

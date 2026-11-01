@@ -83,5 +83,5 @@ local kbConn = RunService.Heartbeat:Connect(function()
 end)
 onCleanup(function() kbConn:Disconnect() end)
 
-A.stage("6 players page + keybind overlay done")
+A.stage("6 keybind overlay done")
 

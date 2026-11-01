@@ -12,7 +12,10 @@ end)
 slider(sChar, "JumpPower", 50, 500, 50, function(v)
 	state.jump, state.jumpActive = v, true
 	local _, hum = charParts()
-	if hum then hum.JumpPower = v end
+	if hum then
+		hum.UseJumpPower = true -- games that use JumpHeight ignore JumpPower entirely
+		hum.JumpPower = v
+	end
 end)
 
 local sChar2 = pChar.section("Behaviour", 2)

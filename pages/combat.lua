@@ -115,9 +115,7 @@ toggle(sKA3, "KA stay behind target", false, function(v) KA.s.behind = v end)
 slider(sKA3, "KA behind distance", 1, 15, 3, function(v) KA.s.behindDist = v end)
 
 local sKA4 = cfgKA.section("Reach", 4)
-toggle(sKA4, "KA extend reach", false, function(v)
-	KA.s.reachOn = v
-end)
+toggle(sKA4, "KA extend reach", false, function(v) KA.setReach(v) end)
 slider(sKA4, "KA reach size", 2, 60, 12, function(v) KA.s.reachSize = v end)
 
 local sKA5 = cfgKA.section("Checks", 5)

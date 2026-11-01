@@ -12,7 +12,8 @@ local function dropESP(plr)
 	for _, d in pairs(set) do pcall(function() d:Remove() end) end
 	ESP.objects[plr] = nil
 end
-Players.PlayerRemoving:Connect(dropESP)
+local dropConn = Players.PlayerRemoving:Connect(dropESP)
+onCleanup(function() dropConn:Disconnect() end)
 
 ESP.s = {
 	box = true, boxStyle = "Full", fill = false,
@@ -46,7 +47,8 @@ local function killCham(plr)
 	if h then pcall(function() h:Destroy() end) end
 	ESP.chams[plr] = nil
 end
-Players.PlayerRemoving:Connect(killCham)
+local chamConn = Players.PlayerRemoving:Connect(killCham)
+onCleanup(function() chamConn:Disconnect() end)
 
 local function espColor(plr, visible)
 	local m = S.colorMode

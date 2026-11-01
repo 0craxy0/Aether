@@ -7,6 +7,8 @@ local registry = {}      -- search + config index
 local accentLinks = {}   -- objects that repaint on accent change
 local KB = {
 	active = {}, index = {}, onToggle = function(_name, _v) end,
+	listening = false, -- true while a keybind row is waiting for a key
+	bindings = {},     -- bind name -> { clear }, so a key can only belong to one row
 	binds = { ["Fly"] = "Toggle fly", ["Aimbot"] = "Toggle aimbot", ["Silent aim"] = "Toggle silent aim", ["Kill aura"] = "Toggle kill aura" },
 }
 for i, n in ipairs({ "Fly", "Aimbot", "Silent aim", "Kill aura", "Player ESP", "Noclip", "Infinite jump", "Fullbright", "Remove fog", "Disable particles", "Anti-AFK", "Auto-execute on teleport" }) do
@@ -321,10 +323,32 @@ function A.keybind(parent, name, default)
 	}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
 
 	local listening = false
-	local key = default
+	local key = nil
+
+	-- the only writer of the keybinds map, so a key can never point at two rows
+	local function apply(newKey)
+		local other = newKey and keybinds[newKey]
+		if other and other ~= name then
+			local o = KB.bindings[other]
+			if o then o.clear() else keybinds[newKey] = nil end
+		end
+		if key and keybinds[key] == name then keybinds[key] = nil end
+		key = newKey
+		b.Text = newKey or "—"
+		if newKey then keybinds[newKey] = name end
+	end
+
+	KB.bindings[name] = {
+		clear = function()
+			if key and keybinds[key] == name then keybinds[key] = nil end
+			key = nil
+			b.Text = "—"
+		end,
+	}
 
 	b.MouseButton1Click:Connect(function()
 		listening = true
+		KB.listening = true -- tail/keybinds.lua must not also fire the key being replaced
 		tween(b, 0.12, { BackgroundColor3 = T.accent })
 		b.Text = "…"
 	end)
@@ -332,19 +356,14 @@ function A.keybind(parent, name, default)
 	local conn = UserInputService.InputBegan:Connect(function(i, gp)
 		if listening and not gp then
 			listening = false
+			KB.listening = false
 			tween(b, 0.15, { BackgroundColor3 = T.stroke })
-			if key then keybinds[key] = nil end
-			key = i.KeyCode.Name
-			b.Text = key
-			keybinds[key] = name
+			apply(i.KeyCode.Name)
 		end
 	end)
-	if key then keybinds[key] = name end
+	A.onCleanup(function() conn:Disconnect() end)
 
-	register(r, name, function(v)
-		if key then keybinds[key] = nil end
-		key = v; b.Text = v; keybinds[v] = name
-	end, function() return key end)
+	apply(default)
+	register(r, name, function(v) apply(v) end, function() return key end)
 	return { get = function() return key end, row = r, conn = conn }
 end
-

@@ -3,6 +3,13 @@
 - uhh basically just a really good script
 - ton of features
 - more coming soon
+
+main.lua is the only file users run. It downloads the rest from `main` in the order
+listed below; every file receives the shared table `A` as `...` and puts what it
+builds on it for the files after it, so **load order matters** (pages/ui.lua has to
+run after tail/keylist.lua, tail/extras.lua after pages/ui.lua).
+If any file fails, the loader rolls the whole load back and warns in the console
+instead of leaving half a UI behind.
 ```
 Aether/
 ├── main.lua                  loader (the only file users run)
@@ -27,14 +34,14 @@ Aether/
 │   ├── character.lua
 │   ├── movement.lua
 │   ├── visuals.lua
-│   ├── combat.lua            partial, finishing it is next
+│   ├── combat.lua            aimbot, silent aim, kill aura
 │   ├── players.lua
-│   ├── ui.lua
-│   └── settings.lua          ⏳ includes the config manager
+│   └── ui.lua                keybind list toggle, rescaling, window physics
 └── tail/
     ├── keylist.lua           keybind list overlay
     ├── extras.lua            easter egg
     ├── glass.lua             glass blur and Liquid Glass
-    ├── keybinds.lua          ⏳ search box and the RightShift handler
-    └── startup.lua           ⏳ unload, shadow layers, Apple skin, intro
+    ├── settings.lua          accent colour, config save/load, session actions
+    ├── keybinds.lua          key handlers and the Keybinds page
+    └── startup.lua           show/hide, search, startup animation
 ```
