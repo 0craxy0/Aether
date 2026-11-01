@@ -1,5 +1,5 @@
 local A = ...
-local tween, notify = A.tween, A.notify
+local tween, notify, sfx = A.tween, A.notify, A.sfx
 local window, shadow, UI = A.window, A.shadow, A.UI
 local closeBtn, searchBox = A.closeBtn, A.searchBox
 local keybinds = A.keybinds
@@ -17,6 +17,7 @@ end
 function A.toggleUI()
 	if UI.busy then return end
 	hidden = not hidden
+	sfx(hidden and "close" or "open")
 	if hidden then
 		local target = UI.active and UI.active.frame or window
 		hiddenTarget = target

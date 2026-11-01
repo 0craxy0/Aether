@@ -2,6 +2,7 @@ local A = ...
 local new, tween, corner, label = A.new, A.tween, A.corner, A.label
 local T, FONT, notify = A.T, A.FONT, A.notify
 local UserInputService = A.UserInputService
+local motion, sfx = A.motion, A.sfx
 
 local registry = {}      -- search + config index
 local accentLinks = {}   -- objects that repaint on accent change
@@ -37,7 +38,11 @@ A.rowAlpha = { idle = 0.35, hover = 0.2 }
 
 local function rowBase(parent, height)
 	local r = rowBaseRaw(parent, height)
-	r.MouseEnter:Connect(function() tween(r, 0.15, { BackgroundTransparency = A.rowAlpha.hover }) end)
+	r.ClipsDescendants = true -- keeps a click ripple inside the row it belongs to
+	r.MouseEnter:Connect(function()
+		tween(r, 0.15, { BackgroundTransparency = A.rowAlpha.hover })
+		sfx("hover")
+	end)
 	r.MouseLeave:Connect(function() tween(r, 0.15, { BackgroundTransparency = A.rowAlpha.idle }) end)
 	return r
 end
@@ -56,6 +61,8 @@ function A.toggle(parent, name, default, onChanged)
 		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
 		Size = UDim2.fromOffset(40, 24), BackgroundColor3 = T.stroke, BorderSizePixel = 0, Parent = r,
 	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	-- registered on first hover: the field only ever holds controls near the cursor
+	r.MouseEnter:Connect(function() motion.magnet(switch, 28, 3.5) end)
 
 	local knob = new("Frame", {
 		AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0, 2, 0.5, 0),
@@ -69,6 +76,15 @@ function A.toggle(parent, name, default, onChanged)
 		state = v; KB.active[name] = v or nil; KB.onToggle(name, v)
 		tween(knob, 0.5, { Position = UDim2.new(0, v and 18 or 2, 0.5, 0) }, Enum.EasingStyle.Elastic)
 		tween(switch, 0.25, { BackgroundColor3 = v and T.good or T.stroke })
+		if not silent then
+			sfx(v and "on" or "off")
+			switch.Size = UDim2.fromOffset(45, 27) -- a small give, like a real switch
+			task.delay(0.01, function()
+				if switch.Parent then
+					tween(switch, 0.5, { Size = UDim2.fromOffset(40, 24) }, Enum.EasingStyle.Elastic)
+				end
+			end)
+		end
 		if not silent and onChanged then
 			local ok, err = pcall(onChanged, v)
 			if not ok then notify(name, tostring(err), "bad") end
@@ -76,6 +92,8 @@ function A.toggle(parent, name, default, onChanged)
 	end
 
 	hit.MouseButton1Click:Connect(function()
+		local m = UserInputService:GetMouseLocation()
+		motion.ripple(r, m.X - r.AbsolutePosition.X, m.Y - r.AbsolutePosition.Y)
 		set(not state)
 		knob.Size = UDim2.fromOffset(30, 16)
 		tween(knob, 0.6, { Size = UDim2.fromOffset(20, 20) }, Enum.EasingStyle.Elastic)
@@ -248,7 +266,11 @@ function A.button(parent, name, text, callback)
 	}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
 	b.MouseEnter:Connect(function() tween(b, 0.12, { BackgroundColor3 = T.accent }) end)
 	b.MouseLeave:Connect(function() tween(b, 0.12, { BackgroundColor3 = T.stroke }) end)
+	r.MouseEnter:Connect(function() motion.magnet(b, 24, 2.5) end)
 	b.MouseButton1Click:Connect(function()
+		local m = UserInputService:GetMouseLocation()
+		motion.ripple(r, m.X - r.AbsolutePosition.X, m.Y - r.AbsolutePosition.Y)
+		sfx("tap")
 		b.Size = UDim2.fromOffset(58, 16)
 		tween(b, 0.6, { Size = UDim2.fromOffset(74, 22) }, Enum.EasingStyle.Elastic)
 		local ok, err = pcall(callback)
@@ -269,6 +291,7 @@ function A.dropdown(parent, name, options, default, onChanged)
 		AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -9, 0, 6),
 		Size = UDim2.fromOffset(96, 22), Parent = r,
 	}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
+	r.MouseEnter:Connect(function() motion.magnet(sel, 24, 2) end)
 
 	local list = new("Frame", { Position = UDim2.fromOffset(9, 34), Size = UDim2.new(1, -18, 0, 0), BackgroundTransparency = 1, Parent = r }, {
 		new("UIListLayout", { Padding = UDim.new(0, 3), SortOrder = Enum.SortOrder.LayoutOrder }),
@@ -282,6 +305,7 @@ function A.dropdown(parent, name, options, default, onChanged)
 			Size = UDim2.new(1, 0, 0, 22), LayoutOrder = i, Parent = list,
 		}, { new("UICorner", { CornerRadius = UDim.new(0, 4) }) })
 		e.MouseButton1Click:Connect(function()
+			sfx("tap", 0.8)
 			sel.Text = opt
 			open = false
 			r.Size = UDim2.new(1, 0, 0, 34)
@@ -321,6 +345,8 @@ function A.keybind(parent, name, default)
 		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -9, 0.5, 0),
 		Size = UDim2.fromOffset(56, 22), Parent = r,
 	}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
+
+	r.MouseEnter:Connect(function() motion.magnet(b, 22, 2.5) end)
 
 	local listening = false
 	local key = nil

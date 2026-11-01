@@ -13,6 +13,7 @@ local kbList = new("Frame", {
 	new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
 A.kbList = kbList
+A.depth.register(kbList, 0.55)
 maskGuis[#maskGuis + 1] = kbList
 
 local kbRows = {}

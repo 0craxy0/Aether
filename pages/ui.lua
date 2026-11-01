@@ -97,3 +97,10 @@ slider(sUI3, "Bounciness", 0, 95, 72, function(v) EL.rest = v / 100 end)
 -- the Extras section is shared: tail/extras.lua and tail/glass.lua add their rows to it
 A.sUI4 = pUI.section("Extras", 4)
 
+-- feel: the panel behaves like an object rather than a picture
+local sFeel = pUI.section("Feel", 5)
+toggle(sFeel, "Parallax depth", true, function(v) A.depth.enabled = v end)
+toggle(sFeel, "Entrance motion", true, function(v) A.motion.enabled = v end)
+toggle(sFeel, "Cursor magnetism", true, function(v) A.motion.magnetOn = v end)
+toggle(sFeel, "Interface sounds", true, function(v) A.sfx.enabled = v end)
+

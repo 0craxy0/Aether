@@ -1,6 +1,7 @@
 local A = ...
 local new, tween, corner, stroke, label = A.new, A.tween, A.corner, A.stroke, A.label
 local T, FONT, onCleanup = A.T, A.FONT, A.onCleanup
+local motion, sfx = A.motion, A.sfx
 local RunService, UserInputService = A.RunService, A.UserInputService
 local screen, window, shadow, EL = A.screen, A.window, A.shadow, A.EL
 local sidebar, content, accentLinks = A.sidebar, A.content, A.accentLinks
@@ -11,19 +12,36 @@ A.pages, A.tabs = pages, tabs
 A.activeTab = nil
 
 -- pages -------------------------------------------------------
+local function tabIndex(name)
+	for i, page in ipairs(tabs) do
+		if page.btn.Text == name then return i end
+	end
+	return 1
+end
+
 local function selectPage(name)
+	-- recolouring the accent re-selects the current tab: that is a repaint, not a trip
+	local same = A.activeTab == name
+	local dir = tabIndex(name) >= tabIndex(A.activeTab or "") and 1 or -1
 	A.activeTab = name
+	if not same then sfx("page") end
+
 	for _, page in pairs(pages) do
 		local on = page.btn.Text == name
-		if on and not page.scroll.Visible then
-			page.scroll.Position = UDim2.fromOffset(0, 40)
-			tween(page.scroll, 0.8, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Elastic)
-		end
 		page.scroll.Visible = on
 		page.bar.Visible = false
 		if on then
 			page.bar.Size = UDim2.fromOffset(2, 0)
 			tween(page.bar, 0.28, { Size = UDim2.fromOffset(2, 14) }, Enum.EasingStyle.Back)
+			if not same then
+				-- the page travels in from the side of the tab you came from,
+				-- then its rows settle in one after another
+				page.scroll.Position = UDim2.fromOffset(dir * 46, 0)
+				page.scale.Scale = 0.97
+				tween(page.scroll, 0.34, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
+				tween(page.scale, 0.34, { Scale = 1 }, Enum.EasingStyle.Quint)
+				motion.reveal(page.scroll)
+			end
 		end
 		tween(page.btn, 0.25, { TextColor3 = on and T.accent or T.muted })
 		tween(page.btn, 0.25, { BackgroundTransparency = on and 0.82 or 1, BackgroundColor3 = T.accent })
@@ -50,7 +68,10 @@ function A.makePage(name, order)
 		new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
 
-	local page = { btn = btn, scroll = scroll, bar = bar, sections = {} }
+	-- its own scale: kept out of uiScales so window rescaling never fights the entrance
+	local pageScale = new("UIScale", { Parent = scroll })
+
+	local page = { btn = btn, scroll = scroll, bar = bar, sections = {}, scale = pageScale }
 
 	function page.section(title, sectionOrder)
 		local sec = new("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = sectionOrder * 2, Parent = scroll })

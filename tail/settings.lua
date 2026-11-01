@@ -1,5 +1,6 @@
 local A = ...
 local T, tween, notify = A.T, A.tween, A.notify
+local sfx = A.sfx
 local HttpService, has = A.HttpService, A.has
 local accentLinks = A.accentLinks
 local toggle, button, dropdown = A.toggle, A.button, A.dropdown
@@ -49,10 +50,15 @@ function A.loadConfig()
 	if not (has.readfile and has.isfile and isfile(FILE)) then return false, "no saved config" end
 	local ok, data = pcall(function() return HttpService:JSONDecode(readfile(FILE)) end)
 	if not ok or type(data) ~= "table" then return false, "config unreadable" end
-	for _, e in ipairs(A.registry) do
-		local v = data[e.name]
-		if e.load and v ~= nil then pcall(e.load, v) end
-	end
+	-- replaying a config fires every widget at once: do it silently
+	sfx.mute = sfx.mute + 1
+	pcall(function()
+		for _, e in ipairs(A.registry) do
+			local v = data[e.name]
+			if e.load and v ~= nil then pcall(e.load, v) end
+		end
+	end)
+	sfx.mute = sfx.mute - 1
 	return true
 end
 
