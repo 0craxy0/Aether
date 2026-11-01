@@ -10,6 +10,19 @@ builds on it for the files after it, so **load order matters** (pages/ui.lua has
 run after tail/keylist.lua, tail/extras.lua after pages/ui.lua).
 If any file fails, the loader rolls the whole load back and warns in the console
 instead of leaving half a UI behind.
+
+## feel
+
+The panel is built to behave like an object, not a picture:
+
+- **depth** - its layers sit at different depths, drift against the cursor, and
+  trail behind the shell when you throw the window
+- **motion** - pages travel in from the side you came from and their rows settle
+  one after another; controls lean toward the cursor
+- **material** - a press leaves a ripple in the row it landed on
+- **voice** - one short blip for the whole interface, pitched per intent
+
+All four are switchable on the UI page, and none of them touch a module's state.
 ```
 Aether/
 ├── main.lua                  loader (the only file users run)
@@ -18,8 +31,11 @@ Aether/
 │   ├── theme.lua             colours and fonts
 │   ├── util.lua              new, tween, corner, stroke, pad, drawX, label
 │   ├── notify.lua            ScreenGui and toasts
+│   ├── sfx.lua               one pitched voice for every interaction
 │   ├── physics.lua           elastic window drag and throw
 │   ├── window.lua            window, shadow, header, sidebar, drag
+│   ├── depth.lua             cursor parallax and throw inertia
+│   ├── motion.lua            staggered entrances, magnetism, ripples
 │   ├── widgets.lua           toggle, slider, button, dropdown, keybind
 │   └── pagekit.lua           makePage, makeConfig, gear, config menu open/close
 ├── modules/
