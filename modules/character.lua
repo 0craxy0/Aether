@@ -19,7 +19,10 @@ local function reapply()
 	local _, hum = charParts()
 	if not hum then return end
 	if state.speedActive then hum.WalkSpeed = state.speed end
-	if state.jumpActive then hum.JumpPower = state.jump end
+	if state.jumpActive then
+		hum.UseJumpPower = true
+		hum.JumpPower = state.jump
+	end
 end
 local charConn = LP.CharacterAdded:Connect(function()
 	task.wait(0.6)
@@ -67,18 +70,33 @@ onCleanup(fly.stop)
 
 -- noclip ------------------------------------------------------
 local noclipConn
+local ncSaved = {}
+
+local function restoreCollide()
+	for p in pairs(ncSaved) do
+		if p.Parent then pcall(function() p.CanCollide = true end) end
+		ncSaved[p] = nil
+	end
+end
+
 function A.setNoclip(on)
 	if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
-	if not on then return end
+	if not on then return restoreCollide() end -- switching noclip off has to put collision back
 	noclipConn = RunService.Stepped:Connect(function()
 		local c = LP.Character
 		if not c then return end
 		for _, p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") then p.CanCollide = false end
+			if p:IsA("BasePart") and p.CanCollide then
+				ncSaved[p] = true
+				p.CanCollide = false
+			end
 		end
 	end)
 end
-onCleanup(function() if noclipConn then noclipConn:Disconnect() end end)
+onCleanup(function()
+	if noclipConn then noclipConn:Disconnect() end
+	restoreCollide()
+end)
 
 -- infinite jump -----------------------------------------------
 local ijConn
@@ -126,9 +144,19 @@ end
 onCleanup(function() A.setFullbright(false) end)
 
 -- fog / particles ---------------------------------------------
+local savedFog
 function A.setNoFog(on)
-	Lighting.FogEnd = on and 1e6 or 100000
+	if on then
+		if not savedFog then savedFog = Lighting.FogEnd end
+		Lighting.FogEnd = 1e6
+	elseif savedFog then
+		Lighting.FogEnd = savedFog -- restore the map's own fog, never a guessed value
+		savedFog = nil
+	end
 end
+onCleanup(function()
+	if savedFog then Lighting.FogEnd = savedFog; savedFog = nil end
+end)
 
 local killedParticles = {}
 function A.setNoParticles(on)

@@ -55,8 +55,12 @@ end)
 
 local inputConn = UserInputService.InputBegan:Connect(function(i, gp)
 	if gp or i.UserInputType ~= Enum.UserInputType.Keyboard then return end
+	if KB.listening then return end -- that keypress is being assigned to a row, not fired
 	if UserInputService:GetFocusedTextBox() then return end
 	local name = snap[i.KeyCode.Name]
+	-- the bind map is authoritative: when the snapshot disagrees, the key was rebound
+	-- this frame and firing it would run the row that no longer owns it
+	if name and keybinds[i.KeyCode.Name] ~= name then name = nil end
 	local fn = name and actions[name]
 	if fn then
 		local ok, err = pcall(fn)

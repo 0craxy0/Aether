@@ -13,7 +13,7 @@ local plrList = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enu
 
 local refreshPlayers
 do
-	local PV = { plr = nil, open = false, query = "", marks = {}, spectating = nil, flinging = false, btns = {} }
+	local PV = { plr = nil, open = false, query = "", marks = {}, spectating = nil, flinging = false, flingConn = nil, btns = {} }
 	local PW = 214
 
 	local psFrame = new("Frame", {
@@ -119,6 +119,14 @@ do
 		cam.CameraSubject = hum
 	end
 
+	local flingSaved = {}
+	local function restoreFling()
+		for p in pairs(flingSaved) do
+			if p.Parent then pcall(function() p.CanCollide = true end) end
+			flingSaved[p] = nil
+		end
+	end
+
 	local function fling(plr)
 		if PV.flinging then return end
 		local _, _, root = charParts()
@@ -134,6 +142,8 @@ do
 			if tick() - t0 > 2.5 or not r or not tr then
 				conn:Disconnect()
 				PV.flinging = false
+				PV.flingConn = nil
+				restoreFling()
 				if r then
 					r.AssemblyLinearVelocity = Vector3.zero
 					r.AssemblyAngularVelocity = Vector3.zero
@@ -142,12 +152,16 @@ do
 				return
 			end
 			for _, p in ipairs(c:GetDescendants()) do
-				if p:IsA("BasePart") then p.CanCollide = false end
+				if p:IsA("BasePart") and p.CanCollide then
+					flingSaved[p] = true
+					p.CanCollide = false
+				end
 			end
 			r.CFrame = tr.CFrame
 			r.AssemblyAngularVelocity = Vector3.new(0, 4e4, 0)
 			r.AssemblyLinearVelocity = Vector3.new(4e4, 0, 4e4)
 		end)
+		PV.flingConn = conn
 	end
 
 	local function setMode(plr, mode)
@@ -241,6 +255,9 @@ do
 	onCleanup(function()
 		pvConn:Disconnect()
 		leaveConn:Disconnect()
+		if PV.flingConn then PV.flingConn:Disconnect(); PV.flingConn = nil end
+		PV.flinging = false
+		restoreFling()
 		for plr in pairs(PV.marks) do unmark(plr) end
 		stopSpectate()
 		panel:Destroy()

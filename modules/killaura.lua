@@ -49,6 +49,12 @@ local function kaRestoreReach()
 	KA.reach = {}
 end
 
+-- turning reach off has to put the handle back now, not whenever kill aura stops
+function KA.setReach(on)
+	KA.s.reachOn = on
+	if not on then kaRestoreReach() end
+end
+
 local function kaApplyReach(tool)
 	local handle = tool and tool:FindFirstChild("Handle")
 	if not handle or not handle:IsA("BasePart") then return end

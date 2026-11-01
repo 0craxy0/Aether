@@ -28,3 +28,16 @@ pcall(function() A.executorName = identifyexecutor() end)
 A.cleanup = {}
 function A.onCleanup(fn) A.cleanup[#A.cleanup + 1] = fn end
 
+-- registered before the first file runs: a failure half way through the loader can
+-- still tear down everything that was built instead of leaking a second ScreenGui
+function A.unload()
+	for i = #A.cleanup, 1, -1 do pcall(A.cleanup[i]) end
+	A.cleanup = {}
+	if A.screen then
+		pcall(function() A.screen:Destroy() end)
+		A.screen = nil
+	end
+	if _G.AetherUnload == A.unload then _G.AetherUnload = nil end
+end
+_G.AetherUnload = A.unload
+

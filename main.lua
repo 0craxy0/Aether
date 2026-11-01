@@ -36,17 +36,24 @@ local A = { base = BASE }
 -- lets auto-execute on teleport re-run this loader
 getgenv().AetherSource = BASE .. "main.lua"
 
+-- a half-loaded hub is worse than none: warn once, then tear down whatever was built
+-- so the ScreenGui from core/notify.lua cannot outlive the load that made it
+local function fail(msg)
+	warn("[Aether] " .. msg)
+	if type(A.unload) == "function" then pcall(A.unload) end
+end
+
 for _, path in ipairs(FILES) do
 	local okGet, src = pcall(game.HttpGet, game, BASE .. path)
 	if not okGet then
-		return warn("[Aether] could not download " .. path .. ": " .. tostring(src))
+		return fail("could not download " .. path .. ": " .. tostring(src))
 	end
 	local fn, compileErr = loadstring(src, "@" .. path)
 	if not fn then
-		return warn("[Aether] syntax error in " .. path .. ": " .. tostring(compileErr))
+		return fail("syntax error in " .. path .. ": " .. tostring(compileErr))
 	end
 	local okRun, runErr = pcall(fn, A)
 	if not okRun then
-		return warn("[Aether] error in " .. path .. ": " .. tostring(runErr))
+		return fail("error in " .. path .. ": " .. tostring(runErr))
 	end
 end
