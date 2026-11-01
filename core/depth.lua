@@ -11,12 +11,21 @@ local D = {
 }
 A.depth = D
 
+-- a layer whose position nothing else owns: its base is captured once
 function D.register(obj, depth)
 	if not obj then return end
 	D.items[#D.items + 1] = { obj = obj, base = obj.Position, depth = depth or 1 }
 end
 
-D.register(A.shadow, 1.7)
+-- a layer something else positions - the shadow is moved by the drag, the throw and
+-- the resize. Its offset is added on top of that live position instead of a captured
+-- base, or parallax pins it to where the window used to be.
+function D.follow(obj, target, depth)
+	if not obj or not target then return end
+	D.items[#D.items + 1] = { obj = obj, follow = target, depth = depth or 1 }
+end
+
+D.follow(A.shadow, window, 1.7)
 D.register(A.header, 0.45)
 D.register(A.search, 0.6)
 D.register(A.body, 0.85)
@@ -27,7 +36,9 @@ D.register(A.toastLayer, 0.35)
 local function park()
 	if D.rest then return end
 	D.rest = true
-	for _, it in ipairs(D.items) do it.obj.Position = it.base end
+	for _, it in ipairs(D.items) do
+		it.obj.Position = it.follow and it.follow.Position or it.base
+	end
 end
 
 local function drift(dt)
@@ -66,7 +77,7 @@ local function drift(dt)
 	end
 	D.rest = false
 	for _, it in ipairs(D.items) do
-		local b = it.base
+		local b = it.follow and it.follow.Position or it.base
 		it.obj.Position = UDim2.new(
 			b.X.Scale, b.X.Offset + ox * it.depth,
 			b.Y.Scale, b.Y.Offset + oy * it.depth
