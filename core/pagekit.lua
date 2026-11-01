@@ -40,7 +40,7 @@ local function selectPage(name)
 				page.scale.Scale = 0.97
 				tween(page.scroll, 0.34, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
 				tween(page.scale, 0.34, { Scale = 1 }, Enum.EasingStyle.Quint)
-				motion.reveal(page.scroll)
+				pcall(motion.reveal, page.scroll) -- cosmetic: never break a page switch
 			end
 		end
 		tween(page.btn, 0.25, { TextColor3 = on and T.accent or T.muted })

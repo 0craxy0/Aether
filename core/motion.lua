@@ -18,7 +18,12 @@ local function tw(o, dur, props, style, delay)
 end
 
 local function ordered(parent)
-	local kids = parent:GetChildren()
+	-- GetChildren also returns the layout, padding and scale objects a container
+	-- carries; only GuiObjects can be ordered, animated or measured
+	local kids = {}
+	for _, c in ipairs(parent:GetChildren()) do
+		if c:IsA("GuiObject") then kids[#kids + 1] = c end
+	end
 	table.sort(kids, function(a, b)
 		if a.LayoutOrder ~= b.LayoutOrder then return a.LayoutOrder < b.LayoutOrder end
 		return a.Name < b.Name
