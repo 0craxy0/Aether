@@ -2,7 +2,7 @@
 ## contents
 - uhh basically just a really good script
 - ton of features
-- more coming soon
+- a lot today, more soon
 
 main.lua is the only file users run. It downloads the rest from `main` in the order
 listed below; every file receives the shared table `A` as `...` and puts what it
