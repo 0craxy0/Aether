@@ -1,6 +1,6 @@
 {
-  "rev": 25,
-  "build": "2026-11-06.25",
-  "notes": "The picker handle sat one topbar too high because the pointer maths subtracted an inset the ScreenGui already ignores. It tracks the cursor exactly now.",
+  "rev": 26,
+  "build": "2026-11-06.26",
+  "notes": "Vertical tracking in the colour picker is measured from the runtime instead of assumed: the topbar offset is derived from the screen and viewport heights, and falls back to learning it from the first click.",
   "loader": "main.lua"
 }

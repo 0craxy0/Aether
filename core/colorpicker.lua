@@ -39,17 +39,29 @@ local function parseHex(text)
 	return nil
 end
 
--- Pointer maths. The UI's ScreenGui ignores the topbar inset (core/notify.lua),
--- so GetMouseLocation and AbsolutePosition already share an origin and nothing
--- is subtracted. If that flag ever flips, the inset has to come back or every
--- handle sits exactly one topbar too high.
-local guiInset = 0
-pcall(function()
-	local s = A.screen
-	if s and not s.IgnoreGuiInset then
-		guiInset = game:GetService("GuiService"):GetGuiInset().Y
-	end
-end)
+-- Pointer maths. Horizontal mapping is unambiguous; vertical is not, because
+-- GetMouseLocation is measured from below the topbar while a GuiObject's
+-- AbsolutePosition is measured from wherever its ScreenGui's origin sits. If the
+-- screen ignores the inset, the two differ by exactly the inset.
+--
+-- That is decidable at runtime instead of guessed: a screen that ignores the
+-- inset spans the full viewport; one that does not is shorter by the inset.
+-- When neither number is available the offset is learned from the first click,
+-- which is guaranteed to be inside the rect that captured it.
+local function pointerOffset()
+	local inset = 0
+	pcall(function() inset = game:GetService("GuiService"):GetGuiInset().Y end)
+	if inset <= 0 then return 0 end
+
+	local screenH, viewH = 0, 0
+	pcall(function()
+		screenH = A.screen and A.screen.AbsoluteSize.Y or 0
+		viewH = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y or 0
+	end)
+	if screenH <= 0 or viewH <= 0 then return nil end -- unknown: learn from a click
+
+	return (screenH + inset * 0.5 >= viewH) and inset or 0
+end
 
 local HUE_CYCLE = ColorSequence.new({
 	ColorSequenceKeypoint.new(0.000, Color3.fromRGB(255, 0, 0)),
@@ -183,24 +195,51 @@ function A.colorPicker(parent, name, defaultColor, onChanged, legacyNames)
 	emit(false)
 
 	-- dragging ----------------------------------------------------
+	local yOff = pointerOffset() -- nil only if the runtime could not be measured
+
 	local function follow(target, onMove)
 		local dragging = false
-		local function apply()
+
+		local function raw(p)
 			local abs, size = target.AbsolutePosition, target.AbsoluteSize
-			local m = UIS:GetMouseLocation()
-			local x = clamp01((m.X - abs.X) / math.max(size.X, 1))
-			local y = clamp01(((m.Y - guiInset) - abs.Y) / math.max(size.Y, 1))
-			onMove(x, y)
+			local x = (p.X - abs.X) / math.max(size.X, 1)
+			local y = (p.Y + (yOff or 0) - abs.Y) / math.max(size.Y, 1)
+			return x, y, abs, size
 		end
+
+		local function learn(p)
+			local _, _, abs, size = raw(p)
+			local inset = 0
+			pcall(function() inset = game:GetService("GuiService"):GetGuiInset().Y end)
+			for _, off in ipairs({ 0, inset, -inset }) do
+				local y = (p.Y + off - abs.Y) / math.max(size.Y, 1)
+				if y >= 0 and y <= 1 then
+					yOff = off
+					break
+				end
+			end
+			if yOff == nil then yOff = 0 end
+			if getgenv and getgenv().AetherDebug then
+				print(string.format("[Aether] picker: absY=%.1f sizeY=%.1f mouseY=%.1f yOff=%s",
+					abs.Y, size.Y, p.Y, tostring(yOff)))
+			end
+		end
+
+		local function apply(p)
+			if dragging and yOff == nil then learn(p) end
+			local x, y = raw(p)
+			onMove(clamp01(x), clamp01(y))
+		end
+
 		target.InputBegan:Connect(function(i)
 			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
 				dragging = true
-				apply()
+				apply(i.Position) -- the input's own position, same source the sliders use
 			end
 		end)
 		UIS.InputChanged:Connect(function(i)
 			if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-				apply()
+				apply(i.Position)
 			end
 		end)
 		UIS.InputEnded:Connect(function(i)
