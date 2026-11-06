@@ -64,6 +64,10 @@ ids in the config so a note is not repeated.
 `id` is what makes a note appear once, so keep it stable. `kind` is `good`, `bad`
 or omitted. Each notice is capped at 220 characters and three are shown per check.
 
+The owner panel has a composer for this: type the note, cycle its kind, *Preview*
+it in the real toast, then *Copy announcements.json* and commit the result. The
+draft survives a reload. Composing here is the only part that is annoying by hand.
+
 This is one-way by design: the client fetches **text** and displays it. It accepts
 no command, no URL to run, no id to target - a note can never make a client do
 anything. Users own the switch on the UI page (*Show announcements*), and turning

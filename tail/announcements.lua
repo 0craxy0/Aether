@@ -27,8 +27,6 @@ local N = {
 }
 A.announce = N
 
-N.TEMPLATE = '{\n  "items": [\n    { "id": "2026-11-06-a", "text": "Double XP this weekend.", "kind": "good" }\n  ]\n}'
-
 local function hydrate()
 	if N.hydrated then return end
 	N.hydrated = true

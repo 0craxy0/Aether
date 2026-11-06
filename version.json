@@ -1,6 +1,6 @@
 {
-  "rev": 15,
-  "build": "2026-11-06.15",
-  "notes": "Announcements: a read-only note the owner publishes as announcements.json on the loader's own origin, shown in the toast layer with a per-user switch. Owner panel on the author's account only, exposing the update check and restart that already exist.",
+  "rev": 16,
+  "build": "2026-11-06.16",
+  "notes": "Announcement composer on the owner panel: write the note, cycle Info/Good/Bad, preview it in the real toast, then copy announcements.json. Drafts survive a reload.",
   "loader": "main.lua"
 }
