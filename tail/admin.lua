@@ -143,7 +143,7 @@ local function endpoint()
 	return (A.announce and A.announce.api) or (A.updater and A.updater.api)
 end
 
-local function publish(item)
+local function post(path, payload)
 	local req = (syn and syn.request) or (fluxus and fluxus.request) or http_request or request
 	if not req then return nil, "this executor has no request function" end
 	local token = (tostring(tokenBox.Text or ""):gsub("%s+", ""))
@@ -151,11 +151,8 @@ local function publish(item)
 	local base = endpoint()
 	if not base then return nil, "no endpoint configured" end
 
-	local payload = { text = item.text }
-	if item.kind then payload.kind = item.kind end
-
 	local ok, res = pcall(req, {
-		Url = base .. "/announce",
+		Url = base .. path,
 		Method = "POST",
 		Headers = {
 			["Content-Type"] = "application/json",
@@ -186,7 +183,7 @@ button(sAnn, "Send to everyone", "SEND", function()
 	sending = true
 	local item = buildItem()
 	task.spawn(function()
-		local ok, err = publish(item)
+		local ok, err = post("/announce", { text = item.text, kind = item.kind })
 		sending = false
 		if ok then
 			A.notify("Announcements", "sent · readers see it within 15s", "good")
@@ -194,6 +191,80 @@ button(sAnn, "Send to everyone", "SEND", function()
 		else
 			A.notify("Announcements", "not sent: " .. tostring(err), "bad")
 		end
+	end)
+end)
+
+-- Release notes -------------------------------------------------
+-- The wording of the update prompt, written here instead of in version.json.
+-- The rev is still version.json's: a rev is a promise that fetching main.lua
+-- returns that build, and only a commit can make that true. So the panel can
+-- author every word the dialog shows, and nothing else.
+local relTitle = new("TextBox", {
+	Text = "", PlaceholderText = "Update title (blank = \"Aether release\")",
+	ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left,
+	Font = FONT.reg, TextSize = 11, TextColor3 = T.text, PlaceholderColor3 = T.muted,
+	BackgroundColor3 = T.raised, BackgroundTransparency = 0.35, BorderSizePixel = 0,
+	Size = UDim2.new(1, 0, 0, 30), Parent = sAnn,
+}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }), new("UIStroke", { Color = T.stroke, Transparency = 0.4, Thickness = 1 }) })
+
+local relScope = "standalone"
+local scopeRow = A.rowBase(sAnn)
+A.label({
+	Text = "Release shows to", Font = FONT.med, TextSize = 12,
+	Position = UDim2.fromOffset(11, 0), Size = UDim2.new(1, -110, 1, 0), Parent = scopeRow,
+})
+local scopeBtn = new("TextButton", {
+	Text = "", Font = FONT.bold, TextSize = 11, AutoButtonColor = false, BorderSizePixel = 0,
+	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -9, 0.5, 0),
+	Size = UDim2.fromOffset(96, 22), Parent = scopeRow,
+}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
+
+local function paintScope()
+	scopeBtn.Text = relScope == "build" and "THIS BUILD" or "EVERYONE"
+	scopeBtn.TextColor3 = relScope == "build" and T.accent or T.text
+	scopeBtn.BackgroundColor3 = T.stroke
+end
+paintScope()
+
+scopeBtn.MouseButton1Click:Connect(function()
+	relScope = relScope == "build" and "standalone" or "build"
+	paintScope()
+end)
+
+local publishingRelease = false
+
+button(sAnn, "Publish release notes", "REL", function()
+	if publishingRelease then return end
+	-- the toast composer caps at 220; a release note has room for more
+	local text = (tostring(box.Text or ""):gsub("%s+", " "))
+	text = text:match("^%s*(.-)%s*$") or ""
+	if text == "" then return A.notify("Release", "the note box is empty", "bad") end
+	if #text > 400 then text = text:sub(1, 400) end
+
+	local payload = { title = tostring(relTitle.Text or ""), notes = text }
+	if relScope == "build" then
+		payload.rev = A.rev
+		payload.build = A.build
+	end
+
+	publishingRelease = true
+	task.spawn(function()
+		local ok, err = post("/release", payload)
+		publishingRelease = false
+		if ok then
+			A.notify("Release", relScope == "build"
+				and ("saved - decorates the rev " .. tostring(A.rev) .. " prompt")
+				or "saved - every client sees it once", "good")
+		else
+			A.notify("Release", "not saved: " .. tostring(err), "bad")
+		end
+	end)
+end)
+
+button(sAnn, "Clear release notes", "CLEAR", function()
+	task.spawn(function()
+		local ok, err = post("/release", { clear = true })
+		A.notify("Release", ok and "cleared" or ("not cleared: " .. tostring(err)), ok and "good" or "bad")
 	end)
 end)
 

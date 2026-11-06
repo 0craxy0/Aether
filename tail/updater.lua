@@ -14,6 +14,8 @@ local U = {
 	interval = 15, -- seconds between checks
 	cooldown = 300, -- quiet for five minutes after a hit, as specified
 	nextCheck = 0,
+	nextRelease = 0,
+	releaseInterval = 60, -- seconds between release-note polls
 	quietUntil = 0,
 	dialog = nil,
 	dismissed = {}, -- revs the user said "not now" to: stay quiet, keep checking
@@ -68,7 +70,7 @@ local function check()
 		return nil
 	end
 	if rev <= (A.rev or 0) then return nil end
-	return { rev = rev, build = data.build, notes = data.notes }
+	return { rev = rev, build = data.build, notes = data.notes, title = data.title }
 end
 
 -- dialog ---------------------------------------------------------
@@ -101,24 +103,37 @@ local function openDialog(info)
 	corner(card, 8)
 	stroke(card, T.stroke, 0.3)
 
-	label({ Text = "Update available", Font = FONT.bold, TextSize = 17, RichText = false,
+	local notesOnly = info.notesOnly == true
+	label({ Text = tostring(info.title or (notesOnly and "Release notes" or "Update available")),
+		Font = FONT.bold, TextSize = 17, RichText = false,
 		Position = UDim2.fromOffset(20, 16), Size = UDim2.new(1, -40, 0, 20), ZIndex = 202, Parent = card })
-	label({ Text = "build " .. tostring(info.build or info.rev), TextColor3 = T.muted, RichText = false,
+	label({
+		Text = notesOnly and "notes from the owner" or ("build " .. tostring(info.build or info.rev)),
+		TextColor3 = T.muted, RichText = false,
 		TextSize = 11, Position = UDim2.fromOffset(20, 38), Size = UDim2.new(1, -40, 0, 14), ZIndex = 202, Parent = card })
 	label({ Text = tostring(info.notes or "A newer build is available."), TextColor3 = T.muted, RichText = false,
 		TextSize = 12, TextWrapped = true, Position = UDim2.fromOffset(20, 58),
-		Size = UDim2.new(1, -40, 0, 44), ZIndex = 202, Parent = card })
+		Size = UDim2.new(1, -40, 0, 56), ZIndex = 202, Parent = card })
 
-	-- the promise, in the dialog, before anything is touched
-	label({
-		Text = "Your configuration is saved now and put back automatically after the update.",
-		TextColor3 = T.good, RichText = false, TextSize = 12, TextWrapped = true,
-		Position = UDim2.fromOffset(20, 112), Size = UDim2.new(1, -40, 0, 32),
-		ZIndex = 202, Parent = card,
-	})
+	-- the promise, in the dialog, before anything is touched. A notes card has no
+	-- update behind it, so it makes no promise about one.
+	if not notesOnly then
+		label({
+			Text = "Your configuration is saved now and put back automatically after the update.",
+			TextColor3 = T.good, RichText = false, TextSize = 12, TextWrapped = true,
+			Position = UDim2.fromOffset(20, 118), Size = UDim2.new(1, -40, 0, 32),
+			ZIndex = 202, Parent = card,
+		})
+	end
 
 	local function dismiss()
-		U.dismissed[info.rev] = true
+		if notesOnly then
+			-- remembered by id, not by rev: a notes card has no rev of its own
+			A.extra.releaseSeen = tostring(info.rid or "")
+			if A.touch then A.touch() end
+		else
+			U.dismissed[info.rev] = true
+		end
 		closeDialog()
 	end
 
@@ -138,8 +153,14 @@ local function openDialog(info)
 		return b
 	end
 
-	mkBtn("Update now", T.accent, -140, function() A.updater.apply(info) end)
-	mkBtn("Not now", T.stroke, -20, dismiss)
+	if notesOnly then
+		-- nothing to update to: offering "Update now" here would restart the client
+		-- into the same build it is already on
+		mkBtn("Got it", T.accent, -20, dismiss)
+	else
+		mkBtn("Update now", T.accent, -140, function() A.updater.apply(info) end)
+		mkBtn("Not now", T.stroke, -20, dismiss)
+	end
 	scrim.MouseButton1Click:Connect(function() pcall(dismiss) end)
 
 	U.dialog = { root = root, card = card, scrim = scrim }
@@ -181,7 +202,40 @@ function U.checkNow()
 		return true
 	end
 	notify("Updates", "up to date", "good")
+	task.spawn(function() pcall(U.checkRelease) end)
 	return false
+end
+
+-- standalone release notes ---------------------------------------
+-- A published record with no rev, or with one this client already reached, is a
+-- note about what shipped rather than an instruction to update. It uses the same
+-- card as the update prompt, so both are authored in one place and look the same,
+-- but it carries a single "Got it" instead of a restart button that would take
+-- the client back to the build it is already running.
+local function fetchRelease()
+	local base = U.api
+	if not base then return nil end
+	local url = base .. "/release?t=" .. tostring(math.floor(os.time() / 60))
+	local ok, res = pcall(game.HttpGet, game, url)
+	if not ok or type(res) ~= "string" or res == "" or #res > 64 * 1024 then return nil end
+	local okDecode, data = pcall(function() return HttpService:JSONDecode(res) end)
+	if not okDecode or type(data) ~= "table" then return nil end
+	return type(data.release) == "table" and data.release or nil
+end
+
+function U.checkRelease()
+	if not U.enabled or U.dialog then return end
+	local rec = fetchRelease()
+	if not rec then return end
+	local id = tostring(rec.id or "")
+	local text = tostring(rec.notes or "")
+	if id == "" or text == "" then return end
+	if tostring(A.extra.releaseSeen or "") == id then return end
+
+	local rev = tonumber(rec.rev)
+	if rev and rev > (A.rev or 0) then return end -- the update prompt covers it
+
+	openDialog({ notesOnly = true, title = rec.title, notes = text, rid = id })
 end
 
 -- apply ----------------------------------------------------------
@@ -214,6 +268,7 @@ end
 -- loop -----------------------------------------------------------
 local running = true
 U.nextCheck = os.clock() + 5
+U.nextRelease = os.clock() + 8
 
 onCleanup(function()
 	running = false
@@ -227,6 +282,10 @@ task.spawn(function()
 		if running and A.announce then A.announce.check() end
 		if running and U.enabled then
 			local now = os.clock()
+			if now >= U.nextRelease then
+				U.nextRelease = now + U.releaseInterval
+				task.spawn(function() pcall(U.checkRelease) end)
+			end
 			if now >= U.nextCheck and now >= U.quietUntil then
 				U.nextCheck = now + U.interval
 				local info = check()

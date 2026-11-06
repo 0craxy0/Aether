@@ -1,6 +1,6 @@
 {
-  "rev": 21,
-  "build": "2026-11-06.21",
-  "notes": "Admin page has a Send button now. Paste the publish token once and notes go straight to the announcements endpoint - no commit, visible to readers within 15s. The token stays in memory only.",
+  "rev": 22,
+  "build": "2026-11-06.22",
+  "notes": "Release notes can be published from the admin panel: title, body and whether they decorate this build or stand alone. The update dialog is the same one, with your words in it.",
   "loader": "main.lua"
 }
