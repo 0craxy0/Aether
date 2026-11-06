@@ -1,6 +1,6 @@
 {
-  "rev": 10,
-  "build": "2026-11-06.10",
-  "notes": "Active-page marker draws again, toast bar and fade fixed, gear opens settings instead of looking like close, sheen and glass kept inside the window's corner, update check falls back to version.json.",
+  "rev": 11,
+  "build": "2026-11-06.11",
+  "notes": "Stats HUD, auto-saving config, anti-void, plus hardening: auto-execute only queues this loader's own host, downloads are size-capped, unload no longer goes through a writable global, and silent aim cannot emit NaN rays.",
   "loader": "main.lua"
 }
