@@ -1,6 +1,6 @@
 {
-  "rev": 20,
-  "build": "2026-11-06.20",
-  "notes": "Announcements actually answer now: the client validated only that the endpoint returned JSON, so a worker without the route (405 {\"error\":\"POST required\"}) counted as a success and the file fallback was never reached. The first note is published too.",
+  "rev": 21,
+  "build": "2026-11-06.21",
+  "notes": "Admin page has a Send button now. Paste the publish token once and notes go straight to the announcements endpoint - no commit, visible to readers within 15s. The token stays in memory only.",
   "loader": "main.lua"
 }

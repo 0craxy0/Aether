@@ -123,6 +123,80 @@ button(sAnn, "Preview note", "SHOW", function()
 	A.notify("Aether", text, kind) -- exactly what a reader will see
 end)
 
+-- Sending. The publish token is typed into this box and lives nowhere else: it
+-- is never written to config.json, never baked into the script, and a box
+-- holding nothing means the button reports "paste the token first". That is the
+-- whole reason this is safe to ship - the ability to publish is the token, and
+-- the token only exists while the owner is looking at this page.
+local tokenBox = new("TextBox", {
+	Text = "", PlaceholderText = "Paste publish token (kept in memory only)",
+	ClearTextOnFocus = false, TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
+	Font = FONT.reg, TextSize = 11, TextColor3 = T.text, PlaceholderColor3 = T.muted,
+	BackgroundColor3 = T.raised, BackgroundTransparency = 0.35, BorderSizePixel = 0,
+	Size = UDim2.new(1, 0, 0, 30), Parent = sAnn,
+}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }), new("UIStroke", { Color = T.stroke, Transparency = 0.4, Thickness = 1 }) })
+
+local sending = false
+
+local function endpoint()
+	return (A.announce and A.announce.api) or (A.updater and A.updater.api)
+end
+
+local function publish(item)
+	local req = (syn and syn.request) or (fluxus and fluxus.request) or http_request or request
+	if not req then return nil, "this executor has no request function" end
+	local token = (tostring(tokenBox.Text or ""):gsub("%s+", ""))
+	if token == "" then return nil, "paste the publish token first" end
+	local base = endpoint()
+	if not base then return nil, "no endpoint configured" end
+
+	local payload = { text = item.text }
+	if item.kind then payload.kind = item.kind end
+
+	local ok, res = pcall(req, {
+		Url = base .. "/announce",
+		Method = "POST",
+		Headers = {
+			["Content-Type"] = "application/json",
+			["Authorization"] = "Bearer " .. token,
+		},
+		Body = A.HttpService:JSONEncode(payload),
+	})
+	if not ok then return nil, tostring(res) end
+	if type(res) ~= "table" then return nil, "no response" end
+
+	local body = type(res.Body) == "string" and res.Body or ""
+	local decoded
+	if body ~= "" then
+		local okDecode, data = pcall(function() return A.HttpService:JSONDecode(body) end)
+		if okDecode and type(data) == "table" then decoded = data end
+	end
+
+	if tonumber(res.StatusCode) == 200 and decoded and decoded.ok then return true, decoded end
+	return nil, (decoded and tostring(decoded.error)) or ("HTTP " .. tostring(res.StatusCode or "?"))
+end
+
+button(sAnn, "Send to everyone", "SEND", function()
+	if sending then return end
+	local text = trimmed()
+	if text == "" then return A.notify("Announcements", "nothing written yet", "bad") end
+	if #text > cap then return A.notify("Announcements", "over " .. cap .. " characters", "bad") end
+
+	sending = true
+	local item = buildItem()
+	task.spawn(function()
+		local ok, err = publish(item)
+		sending = false
+		if ok then
+			A.notify("Announcements", "sent · readers see it within 15s", "good")
+			if A.announce and A.announce.check then A.announce.check(true) end
+		else
+			A.notify("Announcements", "not sent: " .. tostring(err), "bad")
+		end
+	end)
+end)
+
 button(sAnn, "Copy announcements.json", "COPY", function()
 	local text = trimmed()
 	if text == "" then return A.notify("Announcements", "nothing written yet", "bad") end
@@ -153,9 +227,9 @@ button(sAnn, "Reset seen announcements", "RESET", function()
 end)
 
 A.label({
-	Text = "Copy puts the file on your clipboard; commit it as announcements.json to publish. Every reader polls it within five minutes.",
+	Text = "Send posts straight to the announcements endpoint - no commit, no repo edit, visible to every reader within 15s. The token box is memory only: nothing is saved to disk, and closing the script forgets it. Copy is the old fallback if the endpoint is down.",
 	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
-	Size = UDim2.new(1, 0, 0, 28), Parent = sAnn,
+	Size = UDim2.new(1, 0, 0, 42), Parent = sAnn,
 })
 
 -- session -------------------------------------------------------
