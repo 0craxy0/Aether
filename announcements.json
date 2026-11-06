@@ -1,3 +1,9 @@
 {
-  "items": []
+  "items": [
+    {
+      "id": "2026-11-06-a",
+      "text": "Announcements are live. This note came from announcements.json, which means the read path works end to end.",
+      "kind": "good"
+    }
+  ]
 }

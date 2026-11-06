@@ -1,6 +1,7 @@
 local A = ...
 local T, notify, toggle = A.T, A.notify, A.toggle
 local HttpService = A.HttpService
+local DEBUG = getgenv and getgenv().AetherDebug == true
 
 -- Announcements ---------------------------------------------------------------
 -- A read-only note the owner publishes as a file on the loader's own origin:
@@ -75,7 +76,11 @@ local function fetch()
 	local stamp = tostring(math.floor(os.time() / 15))
 	if N.api then
 		local data = getJson(N.api .. "/announcements?t=" .. stamp)
-		if data then
+		-- Shape, not just "it parsed". A Worker deployed before this route existed
+		-- answers 405 {"error":"POST required"} in valid JSON, which parses fine and
+		-- would have pinned the client to the endpoint and skipped the file fallback
+		-- entirely - so announcements looked permanently dead.
+		if data and type(data.items) == "table" then
 			N.source = "api"
 			return data
 		end
@@ -99,6 +104,10 @@ function N.check(force)
 	N.busy = true
 	local ok, err = pcall(function()
 		local data = fetch()
+		if DEBUG then
+			print(string.format("[Aether] announcements: source=%s items=%d",
+				tostring(N.source), (data and type(data.items) == "table") and #data.items or 0))
+		end
 		if not data or type(data.items) ~= "table" then return end
 		local shown = 0
 		for _, item in ipairs(data.items) do

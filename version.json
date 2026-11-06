@@ -1,6 +1,6 @@
 {
-  "rev": 19,
-  "build": "2026-11-06.19",
-  "notes": "Toggle UI rewritten to trust what is on screen instead of a shadow flag, so any state where the panel is not visible makes the next press show it. Shortcut dispatch reads the live bind map (the per-frame snapshot could miss a key), a capture now expires instead of latching, and a blank saved bind can no longer swallow a key. getgenv().AetherDebug prints what every key resolves to.",
+  "rev": 20,
+  "build": "2026-11-06.20",
+  "notes": "Announcements actually answer now: the client validated only that the endpoint returned JSON, so a worker without the route (405 {\"error\":\"POST required\"}) counted as a success and the file fallback was never reached. The first note is published too.",
   "loader": "main.lua"
 }
