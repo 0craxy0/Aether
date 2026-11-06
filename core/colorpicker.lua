@@ -39,11 +39,16 @@ local function parseHex(text)
 	return nil
 end
 
--- The 36px topbar sits inside the coordinate space the mouse is reported in but
--- outside the one GuiObjects live in, so pointer maths needs it subtracted.
+-- Pointer maths. The UI's ScreenGui ignores the topbar inset (core/notify.lua),
+-- so GetMouseLocation and AbsolutePosition already share an origin and nothing
+-- is subtracted. If that flag ever flips, the inset has to come back or every
+-- handle sits exactly one topbar too high.
 local guiInset = 0
 pcall(function()
-	guiInset = game:GetService("GuiService"):GetGuiInset().Y
+	local s = A.screen
+	if s and not s.IgnoreGuiInset then
+		guiInset = game:GetService("GuiService"):GetGuiInset().Y
+	end
 end)
 
 local HUE_CYCLE = ColorSequence.new({

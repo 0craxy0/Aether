@@ -1,6 +1,6 @@
 {
-  "rev": 24,
-  "build": "2026-11-06.24",
-  "notes": "The colour picker's hue handle sat inside the square instead of on the strip. It is a child of the strip now, so it tracks the hue it is pointing at.",
+  "rev": 25,
+  "build": "2026-11-06.25",
+  "notes": "The picker handle sat one topbar too high because the pointer maths subtracted an inset the ScreenGui already ignores. It tracks the cursor exactly now.",
   "loader": "main.lua"
 }
