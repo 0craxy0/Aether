@@ -75,6 +75,7 @@ function A.colorPicker(parent, name, defaultColor, onChanged, legacyNames)
 	-- panel -------------------------------------------------------
 	local ROW_CLOSED, ROW_OPEN = 34, 200
 	local PANEL_Y, SQUARE_H, HUE_H = 38, 96, 12
+	local HUE_Y = PANEL_Y + SQUARE_H + 8
 
 	local square = new("Frame", {
 		Position = UDim2.fromOffset(9, PANEL_Y), Size = UDim2.new(1, -18, 0, SQUARE_H),
@@ -119,16 +120,18 @@ function A.colorPicker(parent, name, defaultColor, onChanged, legacyNames)
 	local hit = new("TextButton", { Text = "", BackgroundTransparency = 1, Size = UDim2.fromScale(1, 1), Parent = square })
 
 	local hue = new("Frame", {
-		Position = UDim2.fromOffset(9, PANEL_Y + SQUARE_H + 8), Size = UDim2.new(1, -18, 0, HUE_H),
+		Position = UDim2.fromOffset(9, HUE_Y), Size = UDim2.new(1, -18, 0, HUE_H),
 		BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Visible = false, Parent = row,
 	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 	new("UIGradient", { Color = HUE_CYCLE, Parent = hue })
 
 	local hCursor = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.6, 0, 0, PANEL_Y + SQUARE_H + 8 + HUE_H / 2),
+		-- child of the strip, so its scale maps to the strip's own width and it can
+		-- never drift off the ends
+		Position = UDim2.fromScale(0.6, 0.5),
 		Size = UDim2.fromOffset(14, HUE_H + 8), BackgroundColor3 = Color3.new(1, 1, 1),
-		BorderSizePixel = 0, Visible = false, Parent = row,
+		BorderSizePixel = 0, Visible = false, Parent = hue,
 	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 	new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 1, Transparency = 0.45, Parent = hCursor })
 

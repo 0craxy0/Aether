@@ -1,6 +1,6 @@
 {
-  "rev": 23,
-  "build": "2026-11-06.23",
-  "notes": "Accent color is a real picker now: drag a saturation/value square, slide the hue strip, or type a hex code. The old named swatches still load from an existing config.",
+  "rev": 24,
+  "build": "2026-11-06.24",
+  "notes": "The colour picker's hue handle sat inside the square instead of on the strip. It is a child of the strip now, so it tracks the hue it is pointing at.",
   "loader": "main.lua"
 }
