@@ -379,13 +379,20 @@ function A.keybind(parent, name, default)
 		b.Text = "…"
 	end)
 
-	local conn = UserInputService.InputBegan:Connect(function(i, gp)
-		if listening and not gp then
-			listening = false
-			KB.listening = false
-			tween(b, 0.15, { BackgroundColor3 = T.stroke })
-			apply(i.KeyCode.Name)
+	local conn = UserInputService.InputBegan:Connect(function(i)
+		if not listening then return end
+		listening = false
+		KB.listening = false
+		tween(b, 0.15, { BackgroundColor3 = T.stroke })
+		-- Only a keyboard key can ever fire: tail/keybinds.lua listens to
+		-- Keyboard input alone. Capturing a mouse button stored a name nothing
+		-- reads, so the row looked bound and did nothing. A stray click cancels
+		-- the capture and leaves the previous key in place.
+		if i.UserInputType ~= Enum.UserInputType.Keyboard then
+			b.Text = key or "—"
+			return
 		end
+		apply(i.KeyCode.Name)
 	end)
 	A.onCleanup(function() conn:Disconnect() end)
 
