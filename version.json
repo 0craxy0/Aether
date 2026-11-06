@@ -1,6 +1,6 @@
 {
-  "rev": 12,
-  "build": "2026-11-06.12",
-  "notes": "Read aloud: hover any label for three seconds, with a bar growing from the middle of the text to its edges as the wait runs. First-run card asks once, remembered on yes regardless of the checkbox. Config gains reserved extras for values that are not widget rows.",
+  "rev": 13,
+  "build": "2026-11-06.13",
+  "notes": "The read-aloud underline now spans exactly the text it belongs to: the pixel width was being handed to UDim2 as a scale component, so a 60px label drew a full-screen line.",
   "loader": "main.lua"
 }

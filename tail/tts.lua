@@ -18,6 +18,7 @@ local TextService = game:GetService("TextService")
 -- a short, quiet blip per word, which at least confirms what was picked up.
 local HOLD = 3     -- seconds of continuous hover before it speaks
 local SCAN = 0.08  -- how often the pointer is re-tested against the labels
+local THICK = 1.5  -- underline height in pixels
 
 local TTS = { enabled = false, backend = nil, modal = nil }
 A.tts = TTS
@@ -47,7 +48,7 @@ end
 -- layout is touched (an extra child would resize anything with AutomaticSize)
 local bar = new("Frame", {
 	Name = "ttsUnderline", AnchorPoint = Vector2.new(0.5, 0), Visible = false,
-	Size = UDim2.new(0, 0, 0, 2), BackgroundColor3 = T.accent,
+	Size = UDim2.fromOffset(0, THICK), BackgroundColor3 = T.accent,
 	BorderSizePixel = 0, ZIndex = 300, Parent = screen,
 }, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 maskGuis[#maskGuis + 1] = bar -- ESP must not draw across the underline
@@ -66,7 +67,7 @@ local function hideBar()
 	barToken += 1
 	local id = barToken
 	if barTween then barTween:Cancel(); barTween = nil end
-	tween(bar, 0.12, { Size = UDim2.new(0, 0, 0, 2) })
+	tween(bar, 0.12, { Size = UDim2.fromOffset(0, THICK) })
 	task.delay(0.2, function()
 		if barToken == id and bar.Parent then bar.Visible = false end
 	end)
@@ -112,8 +113,10 @@ local function showBar(lbl)
 	bar.Visible = true
 	bar.BackgroundTransparency = 0
 	bar.Position = UDim2.fromOffset(x + w / 2, textTop + lbl.TextSize * 1.02)
-	bar.Size = UDim2.new(0, 0, 0, 2)
-	barTween = linear(bar, HOLD, { Size = UDim2.new(w, 0, 0, 2) })
+	-- pixels, not scale: UDim2.new(w, 0, ...) would read w as a fraction of the
+	-- screen, which drew the underline across the whole viewport
+	bar.Size = UDim2.fromOffset(0, THICK)
+	barTween = linear(bar, HOLD, { Size = UDim2.fromOffset(w, THICK) })
 end
 
 -- which label is under the pointer ------------------------------------------
