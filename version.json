@@ -1,6 +1,6 @@
 {
-  "rev": 13,
-  "build": "2026-11-06.13",
-  "notes": "The read-aloud underline now spans exactly the text it belongs to: the pixel width was being handed to UDim2 as a scale component, so a 60px label drew a full-screen line.",
+  "rev": 14,
+  "build": "2026-11-06.14",
+  "notes": "Counter projectile gravity: one gravity step is added back to every projectile part each physics frame, so shots fly straight instead of dropping. Combat page gains a Projectiles section with strength and speed threshold.",
   "loader": "main.lua"
 }

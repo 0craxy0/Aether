@@ -130,4 +130,20 @@ toggle(sKA6, "KA show range ring", true, function(v) KA.s.showRing = v end)
 toggle(sKA6, "KA highlight target", true, function(v) KA.s.highlight = v end)
 toggle(sKA6, "KA kill notifications", false, function(v) KA.s.killNotify = v end)
 
+-- Projectiles --------------------------------------------------
+local P = A.projectile
+local cfgProj = makeConfig("Projectiles")
+local sProj = pCombat.section("Projectiles", 2)
+local projToggle = toggle(sProj, "Counter projectile gravity", false, function(v) P.set(v) end)
+gear(projToggle, cfgProj)
+
+local sProj1 = cfgProj.section("Counter", 1)
+slider(sProj1, "Counter strength %", 0, 100, 100, function(v) P.pct = v end)
+slider(sProj1, "Min speed", 10, 200, 40, function(v) P.minSpeed = v end)
+A.label({
+	Text = "Adds one gravity step back to every projectile part each physics frame, so a shot flies where it was aimed instead of dropping. Only parts this client simulates can be corrected: anything the server keeps ownership of ignores local velocity and still falls.",
+	TextColor3 = A.T.muted, TextSize = 11, TextWrapped = true,
+	Size = UDim2.new(1, 0, 0, 64), Parent = sProj1,
+})
+
 A.stage("5 combat page done")
