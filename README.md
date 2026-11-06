@@ -27,8 +27,11 @@ All four are switchable on the UI page, and none of them touch a module's state.
 ## updating
 
 `tail/updater.lua` reads `version.json` every 15s (Settings > Updates) and compares
-its `rev` with the `rev` compiled into the running loader. On a newer rev it asks
-once, saying plainly that the configuration will be saved and restored, then:
+its `rev` with the `rev` compiled into the running loader. A POST endpoint on
+`A.updater.api` is used when the executor has a `request` function, and the static
+file is the fallback for everything else - a check never reports "up to date" just
+because the endpoint could not be reached. On a newer rev it asks once, saying
+plainly that the configuration will be saved and restored, then:
 
 1. writes the config to `Aether/config.json`
 2. unloads through `_G.AetherUnload`, exactly like the Unload button
@@ -80,6 +83,7 @@ Aether/
 └── tail/
     ├── keylist.lua           keybind list overlay
     ├── extras.lua            easter egg
+    ├── hud.lua               stats HUD: fps, ping, players
     ├── glass.lua             glass blur and Liquid Glass
     ├── settings.lua          accent colour, config save/load, session actions
     ├── keybinds.lua          key handlers and the Keybinds page

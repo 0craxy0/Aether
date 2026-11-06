@@ -89,6 +89,9 @@ function A.toggle(parent, name, default, onChanged)
 			local ok, err = pcall(onChanged, v)
 			if not ok then notify(name, tostring(err), "bad") end
 		end
+		-- a committed change from the user marks the config dirty; the debounce
+		-- and the "is a config being replayed right now" test live in settings
+		if not silent and A.touch then A.touch() end
 	end
 
 	hit.MouseButton1Click:Connect(function()
@@ -140,17 +143,24 @@ function A.slider(parent, name, min, max, default, onChanged)
 	local function commitNow()
 		commitToken += 1
 		if onChanged then pcall(onChanged, value) end
+		if A.touch then A.touch() end
 	end
 	local function queueCommit()
 		if not onChanged then return end
 		commitToken += 1
 		local t = commitToken
 		if dragging then
-			if not KB.opts.sliderRelease then pcall(onChanged, value) end
+			if not KB.opts.sliderRelease then
+				pcall(onChanged, value)
+				if A.touch then A.touch() end
+			end
 			return
 		end
 		task.delay(0.2, function()
-			if t == commitToken then pcall(onChanged, value) end
+			if t == commitToken then
+				pcall(onChanged, value)
+				if A.touch then A.touch() end
+			end
 		end)
 	end
 	local endConn = UserInputService.InputEnded:Connect(function(i)
@@ -311,6 +321,7 @@ function A.dropdown(parent, name, options, default, onChanged)
 			r.Size = UDim2.new(1, 0, 0, 34)
 			list.Size = UDim2.new(1, -18, 0, 0)
 			if onChanged then pcall(onChanged, opt) end
+			if A.touch then A.touch() end
 		end)
 	end
 
@@ -393,6 +404,7 @@ function A.keybind(parent, name, default)
 			return
 		end
 		apply(i.KeyCode.Name)
+		if A.touch then A.touch() end
 	end)
 	A.onCleanup(function() conn:Disconnect() end)
 

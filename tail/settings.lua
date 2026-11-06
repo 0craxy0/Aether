@@ -1,5 +1,5 @@
 local A = ...
-local T, tween, notify = A.T, A.tween, A.notify
+local T, tween, notify, onCleanup = A.T, A.tween, A.notify, A.onCleanup
 local sfx = A.sfx
 local HttpService, has = A.HttpService, A.has
 local accentLinks = A.accentLinks
@@ -50,17 +50,46 @@ function A.loadConfig()
 	if not (has.readfile and has.isfile and isfile(FILE)) then return false, "no saved config" end
 	local ok, data = pcall(function() return HttpService:JSONDecode(readfile(FILE)) end)
 	if not ok or type(data) ~= "table" then return false, "config unreadable" end
-	-- replaying a config fires every widget at once: do it silently
+	-- replaying a config fires every widget at once: do it silently, and keep
+	-- auto-save out of it so the file is not rewritten while it is being read
 	sfx.mute = sfx.mute + 1
+	A.configLoading = true
 	pcall(function()
 		for _, e in ipairs(A.registry) do
 			local v = data[e.name]
 			if e.load and v ~= nil then pcall(e.load, v) end
 		end
 	end)
+	A.configLoading = false
 	sfx.mute = sfx.mute - 1
 	return true
 end
+
+-- auto-save ---------------------------------------------------------
+-- One write, 1.5s after the last change, so dragging a slider does not hit the
+-- disk sixty times a second. A config being replayed never schedules a write.
+local AUTOSAVE_DELAY = 1.5
+A.autoSave = true
+local saveTimer
+
+function A.touch()
+	if not A.autoSave or A.configLoading or not has.writefile then return end
+	if saveTimer then task.cancel(saveTimer) end
+	saveTimer = task.delay(AUTOSAVE_DELAY, function()
+		saveTimer = nil
+		if A.configLoading or not A.autoSave then return end
+		A.saveConfig()
+	end)
+end
+
+function A.flushConfig()
+	if saveTimer then task.cancel(saveTimer); saveTimer = nil end
+	return A.saveConfig()
+end
+
+-- a change made in the last 1.5s is not on disk yet; write it before the panel
+-- goes away, or the auto-save the user trusted loses the last thing they set
+onCleanup(function() if saveTimer then A.flushConfig() end end)
 
 -- page ------------------------------------------------------------
 local pSet = A.makePage("Settings", 8)
@@ -72,8 +101,9 @@ dropdown(sLook, "Accent color", ACCENT_NAMES, "Blue", function(v)
 end)
 
 local sCfg = pSet.section("Config", 2)
+toggle(sCfg, "Auto-save on change", true, function(v) A.autoSave = v end)
 button(sCfg, "Save config", "SAVE", function()
-	local ok, err = A.saveConfig()
+	local ok, err = A.flushConfig()
 	if ok then notify("Config", "saved to " .. FILE, "good") else notify("Config", tostring(err), "bad") end
 end)
 button(sCfg, "Load config", "LOAD", function()
@@ -87,7 +117,10 @@ button(sSess, "Rejoin server", "REJOIN", A.rejoin)
 button(sSess, "Server hop", "HOP", A.hop)
 button(sSess, "Copy server ID", "COPY", function() A.copy(game.JobId) end)
 button(sSess, "Unload Aether", "UNLOAD", function()
-	if _G.AetherUnload then _G.AetherUnload() end
+	-- A.unload is this instance's own teardown. Going through _G.AetherUnload
+	-- meant any other script in the executor could swap that name for its own
+	-- function and have it called here instead.
+	if type(A.unload) == "function" then A.unload() end
 end)
 
 A.stage("7 settings page done")

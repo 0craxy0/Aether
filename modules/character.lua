@@ -143,6 +143,38 @@ function A.setFullbright(on)
 end
 onCleanup(function() A.setFullbright(false) end)
 
+-- anti-void ----------------------------------------------------
+-- Maps that do not kill you under the floor leave you falling forever (or bounce
+-- you back with everything reset). Keep the last place the character was really
+-- standing and put it back there once it drops past the world's destroy height.
+local voidConn, voidSafe, voidFloor
+
+function A.setAntiVoid(on)
+	if voidConn then voidConn:Disconnect(); voidConn = nil end
+	voidSafe = nil
+	if not on then return end
+
+	local ok, fh = pcall(function() return workspace.FallenPartsDestroyHeight end)
+	voidFloor = (ok and type(fh) == "number") and fh or -500
+
+	voidConn = RunService.Heartbeat:Connect(function()
+		local _, hum, root = charParts()
+		if not hum or not root or hum.Health <= 0 then
+			voidSafe = nil -- never carry a corpse's position over to the respawn
+			return
+		end
+		if hum.FloorMaterial ~= Enum.Material.Air and root.Position.Y > voidFloor + 50 then
+			voidSafe = root.CFrame -- grounded and clear: worth coming back to
+		elseif voidSafe and root.Position.Y < voidFloor + 25 then
+			root.CFrame = voidSafe
+			root.AssemblyLinearVelocity = Vector3.zero
+			voidSafe = nil
+			notify("Anti-void", "pulled back to the last safe spot", "good")
+		end
+	end)
+end
+onCleanup(function() A.setAntiVoid(false) end)
+
 -- fog / particles ---------------------------------------------
 local savedFog
 function A.setNoFog(on)

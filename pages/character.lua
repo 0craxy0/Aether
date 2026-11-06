@@ -22,4 +22,5 @@ local sChar2 = pChar.section("Behaviour", 2)
 toggle(sChar2, "Infinite jump", false, A.setInfJump)
 toggle(sChar2, "Noclip", false, A.setNoclip)
 toggle(sChar2, "Anti-AFK", true, A.setAntiAfk)
+toggle(sChar2, "Anti-void", false, A.setAntiVoid)
 

@@ -10,6 +10,7 @@ A.T = {
 	accent  = Color3.fromHex("0A84FF"),
 	accent2 = Color3.fromHex("64D2FF"),
 	good    = Color3.fromHex("30D158"),
+	warn    = Color3.fromHex("FFD60A"),
 	bad     = Color3.fromHex("FF453A"),
 }
 
