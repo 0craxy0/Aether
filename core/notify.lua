@@ -22,8 +22,27 @@ local toastLayer = new("Frame", {
 })
 A.toastLayer = toastLayer
 
+-- Live toasts, oldest first. Without a ceiling, one module erroring on every
+-- frame stacks cards faster than they expire: the layer grows without bound and
+-- the whole ScreenGui starts costing frame time.
+local MAX_TOASTS = 4
+local live = {}
+
+local function retire(card)
+	for i = #live, 1, -1 do
+		if live[i] == card then table.remove(live, i) end
+	end
+	card:Destroy()
+end
+
 function A.notify(title, body, kind)
 	local accent = kind == "bad" and T.bad or kind == "good" and T.good or T.accent
+
+	-- make room before building the new card, so the ceiling is never exceeded
+	while #live >= MAX_TOASTS do
+		local oldest = table.remove(live, 1)
+		if oldest and oldest.Parent then oldest:Destroy() end
+	end
 
 	-- A CanvasGroup, so GroupTransparency can fade the whole card on the way out.
 	-- As a plain Frame only the background faded: the text stayed fully opaque
@@ -34,6 +53,7 @@ function A.notify(title, body, kind)
 	})
 	corner(card, 8)
 	stroke(card, T.stroke, 0.35)
+	live[#live + 1] = card
 
 	-- the intent bar: created clear and brought in, it never appeared at all
 	local bar = new("Frame", { Size = UDim2.fromOffset(3, 34), Position = UDim2.fromOffset(0, 10), BackgroundColor3 = accent, BackgroundTransparency = 1, BorderSizePixel = 0, Parent = card }, {
@@ -55,7 +75,7 @@ function A.notify(title, body, kind)
 			tween(pop, 0.3, { Scale = 0.6 })
 			tween(card, 0.3, { GroupTransparency = 1 })
 			task.wait(0.22)
-			card:Destroy()
+			retire(card)
 		end
 	end)
 end

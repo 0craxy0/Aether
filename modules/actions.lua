@@ -48,9 +48,24 @@ function A.loadConfig() end
 local queueFn = queue_on_teleport or queueonteleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
 local tpConn
 
+-- The queue string is executed on a *later* server, after this one is gone and
+-- nothing here can check it again, so the only URL it may carry is one this
+-- loader chose. getgenv().AetherSource is writable by any other script in the
+-- executor: honouring it unvalidated meant anything that set it could make
+-- Aether re-run its own code on every teleport. Plain http is refused as well -
+-- that string is a download, and a downgraded one is MITM-able.
+local function ownSource(raw)
+	if type(raw) ~= "string" then return nil end
+	local scheme, host = raw:match("^(https)://([^/]+)/")
+	if not scheme then return nil end
+	local baseHost = (A.base or ""):match("^https://([^/]+)/")
+	if not baseHost or host ~= baseHost then return nil end
+	return raw
+end
+
 local function buildQueue()
-	local src = getgenv and getgenv().AetherSource
-	if type(src) == "string" and src:match("^https?://") then
+	local src = ownSource(A.source) or ownSource(getgenv and getgenv().AetherSource)
+	if src then
 		return string.format("loadstring(game:HttpGet(%q))()", src)
 	end
 	if has.isfile and isfile("Aether/aether.lua") then
@@ -64,7 +79,7 @@ function A.setAutoExec(on)
 	if not queueFn then return notify("Auto-execute", "queue_on_teleport unsupported", "bad") end
 	local code = buildQueue()
 	if not code then
-		return notify("Auto-execute", "set getgenv().AetherSource or save to Aether/aether.lua", "bad")
+		return notify("Auto-execute", "no valid source (must be an https URL on Aether's own host)", "bad")
 	end
 	tpConn = LP.OnTeleport:Connect(function(st)
 		if st == Enum.TeleportState.Started then

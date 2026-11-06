@@ -153,7 +153,7 @@ function U.apply(info)
 
 	-- the dialog promised the config survives, so if it cannot be written we do not
 	-- take the UI away at all rather than silently dropping everything the user set
-	local okSave, saved, msg = pcall(A.saveConfig)
+	local okSave, saved, msg = pcall(A.flushConfig)
 	if not (okSave and saved == true) then
 		notify("Update cancelled", "config could not be saved: " .. tostring(msg or saved or "unknown"), "bad")
 		return
@@ -162,8 +162,10 @@ function U.apply(info)
 	task.spawn(function()
 		A.sfx("close")
 		-- tear the old UI down through the same path the Unload button uses, then
-		-- run the loader again; it replays the config on the way back up
-		if _G.AetherUnload then pcall(_G.AetherUnload) end
+		-- run the loader again; it replays the config on the way back up. A.unload
+		-- is this instance's own teardown - _G.AetherUnload is writable by any
+		-- other script in the executor and would be called right here.
+		if type(A.unload) == "function" then pcall(A.unload) end
 		task.wait(0.15)
 		local url = A.base .. "main.lua?t=" .. tostring(os.time())
 		local okGet, src = pcall(game.HttpGet, game, url)

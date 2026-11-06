@@ -136,8 +136,13 @@ function SA.process(self, method, ...)
 			if typeof(origin) ~= "Vector3" or typeof(dir) ~= "Vector3" then return end
 			local pos = SA.aimPos()
 			if not pos then return end
+			-- aiming at the point the ray starts from has no direction: .Unit is
+			-- NaN there, and a NaN direction is rejected by the server as a
+			-- non-finite argument instead of simply missing
+			local delta = pos - origin
+			if delta.Magnitude < 1e-3 then return end
 			local a = table.pack(...)
-			a[2] = (pos - origin).Unit * dir.Magnitude
+			a[2] = delta.Unit * dir.Magnitude
 			return "args", a
 		elseif SA_FIND[method] then
 			if not s.mFindPart then return end
@@ -146,14 +151,18 @@ function SA.process(self, method, ...)
 			local pos = SA.aimPos()
 			if not pos then return end
 			local a = table.pack(...)
-			a[1] = Ray.new(ray.Origin, (pos - ray.Origin).Unit * ray.Direction.Magnitude)
+			local d = pos - ray.Origin
+			if d.Magnitude < 1e-3 then return end
+			a[1] = Ray.new(ray.Origin, d.Unit * ray.Direction.Magnitude)
 			return "args", a
 		end
 	elseif s.mScreenRay and (method == "ScreenPointToRay" or method == "ViewportPointToRay") and self == workspace.CurrentCamera then
 		local pos = SA.aimPos()
 		if not pos then return end
 		local origin = self.CFrame.Position
-		return "ret", Ray.new(origin, (pos - origin).Unit)
+		local d = pos - origin
+		if d.Magnitude < 1e-3 then return end
+		return "ret", Ray.new(origin, d.Unit)
 	end
 end
 
