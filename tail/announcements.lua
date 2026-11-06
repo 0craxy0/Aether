@@ -17,7 +17,10 @@ local N = {
 	seenList = {},    -- oldest first, capped
 	maxSeen = 60,
 	last = 0,
-	interval = 300,   -- seconds between checks
+	interval = 300,       -- seconds between checks when reading the file
+	apiInterval = 15,     -- and when the endpoint answers
+	api = "https://aether-version.mariavictorlennySingh.workers.dev",
+	source = nil,         -- "api" or "file": which one answered last
 	busy = false,
 	hydrated = false,
 	url = "announcements.json",
@@ -56,8 +59,7 @@ local function clean(s)
 	return s
 end
 
-local function fetch()
-	local url = A.base .. N.url .. "?t=" .. tostring(math.floor(os.time() / N.interval))
+local function getJson(url)
 	local ok, res = pcall(game.HttpGet, game, url)
 	if not ok or type(res) ~= "string" then return nil end
 	if #res == 0 or #res > N.maxBytes then return nil end
@@ -66,11 +68,33 @@ local function fetch()
 	return data
 end
 
+-- The endpoint is the fast path (a publish is visible in seconds); the committed
+-- file is the floor. If the Worker is down, moved or has no storage bound, this
+-- falls back to exactly what it did before the endpoint existed.
+local function fetch()
+	local stamp = tostring(math.floor(os.time() / 15))
+	if N.api then
+		local data = getJson(N.api .. "/announcements?t=" .. stamp)
+		if data then
+			N.source = "api"
+			return data
+		end
+	end
+	local data = getJson(A.base .. N.url .. "?t=" .. stamp)
+	if data then N.source = "file" end
+	return data
+end
+
+local function cadence()
+	if N.api and N.source ~= "file" then return N.apiInterval end
+	return N.interval
+end
+
 function N.check(force)
 	hydrate()
 	if not N.on or N.busy then return end
 	local now = os.clock()
-	if not force and now - N.last < N.interval then return end
+	if not force and now - N.last < cadence() then return end
 	N.last = now
 	N.busy = true
 	local ok, err = pcall(function()

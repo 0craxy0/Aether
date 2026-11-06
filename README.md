@@ -48,10 +48,15 @@ end
 
 ## announcements
 
-`announcements.json` sits next to `version.json` on the same origin the loader
-already trusts. `tail/announcements.lua` reads it on the update poll (self-throttled
-to five minutes), shows anything not yet seen in the toast layer, and remembers seen
-ids in the config so a note is not repeated.
+`tail/announcements.lua` reads notes from **two places, in order**:
+
+1. `GET /announcements` on the version Worker (`A.announce.api`) - polls every
+   15s. Publishing there is one authenticated request, so a note is live without
+   touching GitHub.
+2. `announcements.json` next to `version.json`, polled every 5 minutes - the floor.
+   If the Worker is down, moved, or has no storage bound, this is what answers.
+
+Either way the shape is the same:
 
 ```json
 {
@@ -61,12 +66,25 @@ ids in the config so a note is not repeated.
 }
 ```
 
-`id` is what makes a note appear once, so keep it stable. `kind` is `good`, `bad`
-or omitted. Each notice is capped at 220 characters and three are shown per check.
+`id` is what makes a note appear once, so keep it stable (the endpoint mints one
+when you leave it out). `kind` is `good`, `bad` or omitted. Each notice is capped at
+220 characters and three are shown per check.
 
-The owner panel has a composer for this: type the note, cycle its kind, *Preview*
-it in the real toast, then *Copy announcements.json* and commit the result. The
-draft survives a reload. Composing here is the only part that is annoying by hand.
+Publishing from anywhere, no browser and no GitHub edit:
+
+```bash
+curl -X POST https://aether-version.<subdomain>.workers.dev/announce \
+  -H "Authorization: Bearer $AETHER_PUBLISH_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Double XP this weekend.","kind":"good"}'
+```
+
+`{"clear":true}` empties the list. The token is a Worker secret and never appears
+in this repo or in the script - see `Aether-Version/README.md` for setup.
+
+The owner panel also has a composer: type the note, cycle its kind, *Preview* it in
+the real toast, then *Copy announcements.json* if you would rather commit it. The
+draft survives a reload.
 
 This is one-way by design: the client fetches **text** and displays it. It accepts
 no command, no URL to run, no id to target - a note can never make a client do

@@ -1,6 +1,6 @@
 {
-  "rev": 17,
-  "build": "2026-11-06.17",
-  "notes": "Toggle UI keybind fixed: binding a key no longer fires the action it was binding, a busy config menu no longer swallows the press, a stale config frame can no longer be restored in place of the window, and hiding releases TextBox focus so the key comes back.",
+  "rev": 18,
+  "build": "2026-11-06.18",
+  "notes": "Announcements can now come from the version Worker instead of a committed file: one authenticated POST publishes a note that every client sees within 15s, with announcements.json kept as the offline floor.",
   "loader": "main.lua"
 }
