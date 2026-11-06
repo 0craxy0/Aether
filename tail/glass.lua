@@ -21,6 +21,9 @@ local glConn = RunService.Heartbeat:Connect(function()
 		or (UI.active ~= nil and UI.active.frame.GroupTransparency < 0.95)
 	local want = (GL.on and shown) and GL.blur or 0
 	GL.fx.Size = GL.fx.Size + (want - GL.fx.Size) * 0.12
+	-- ease, then land: an exponential approach never reaches zero, so turning the
+	-- blur off left a fractional blur on the whole screen for the rest of the session
+	if math.abs(GL.fx.Size - want) < 0.05 then GL.fx.Size = want end
 end)
 onCleanup(function() glConn:Disconnect(); GL.fx:Destroy() end)
 
@@ -46,7 +49,11 @@ LG.rimGrad = new("UIGradient", {
 })
 LG.top = new("Frame", {
 	Name = "lgTop", Size = UDim2.fromScale(1, 0.3), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Visible = false, Active = false, ZIndex = 59, Parent = window,
-}, { new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.82), NumberSequenceKeypoint.new(1, 1) }) }) })
+}, {
+	-- same radius as the shell, or the square frame shows past the rounded corner
+	new("UICorner", { CornerRadius = wcorner and wcorner.CornerRadius or UDim.new(0, 19) }),
+	new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.82), NumberSequenceKeypoint.new(1, 1) }) }),
+})
 LG.glowHolder = new("Frame", { Name = "lgGlow", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, Active = false, ZIndex = 58, Parent = window })
 LG.glow = {}
 for i = 1, 6 do

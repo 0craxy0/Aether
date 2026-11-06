@@ -29,7 +29,9 @@ local function selectPage(name)
 	for _, page in pairs(pages) do
 		local on = page.btn.Text == name
 		page.scroll.Visible = on
-		page.bar.Visible = false
+		-- The bar is the only "you are here" the sidebar has, and it used to be
+		-- switched off for every page including the active one, so it never drew.
+		page.bar.Visible = on
 		if on then
 			page.bar.Size = UDim2.fromOffset(2, 0)
 			tween(page.bar, 0.28, { Size = UDim2.fromOffset(2, 14) }, Enum.EasingStyle.Back)
@@ -209,7 +211,9 @@ local function openConfig(cfg)
 	UI.busy = true
 	tween(window, 0.2, { GroupTransparency = 1, Size = UDim2.fromOffset(W * 0.94, H * 0.94) })
 	task.delay(0.2, function()
-		if not screen.Parent then return end
+		-- screen gone (unload raced the open): release the lock, or every later
+		-- open/close is refused for the rest of the session
+		if not screen.Parent then UI.busy = false; return end
 		window.Visible = false
 		window.Size = UDim2.fromOffset(W, H)
 		window.GroupTransparency = 0
@@ -231,7 +235,10 @@ function UI.close()
 	UI.busy = true
 	tween(cfg.frame, 0.2, { GroupTransparency = 1, Size = UDim2.fromOffset(W * 0.94, H * 0.94) })
 	task.delay(0.2, function()
-		if not screen.Parent then return end
+		if not screen.Parent then
+			UI.busy = false -- same lock as openConfig: never leave the panel stranded
+			return
+		end
 		cfg.frame.Visible = false
 		window.Position = cfg.frame.Position
 		shadow.Position = window.Position
@@ -246,22 +253,41 @@ function UI.close()
 end
 
 -- adds a gear button to a toggle row that opens `cfg`
+-- The mark used to be two crossed arms - the same glyph the panel uses for
+-- "close", at the same weight - so it read as "dismiss this row" and sat on top
+-- of the toggle switch. It is now the usual three-slider settings mark, kept
+-- clear of the switch, over a pill that only shows itself under the cursor.
+local GEAR_KNOB_X = { 8, 14, 10 }
+
 function A.gear(tg, cfg)
 	local btn = new("TextButton", {
-		Text = "", Font = FONT.med, TextSize = 17, TextColor3 = T.muted,
-		BackgroundTransparency = 1, AutoButtonColor = false,
-		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -62, 0.5, 0),
-		Size = UDim2.fromOffset(24, 24), Parent = tg.row,
-	})
-	btn.MouseEnter:Connect(function() for _, a in ipairs(btn:GetChildren()) do if a.Name == "xarm" then tween(a, 0.15, { BackgroundColor3 = T.text }) end end end)
-	btn.MouseLeave:Connect(function() for _, a in ipairs(btn:GetChildren()) do if a.Name == "xarm" then tween(a, 0.15, { BackgroundColor3 = T.muted }) end end end)
-	for i = 1, 2 do
+		Text = "", BackgroundColor3 = T.stroke, BackgroundTransparency = 1,
+		AutoButtonColor = false, BorderSizePixel = 0,
+		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -88, 0.5, 0),
+		Size = UDim2.fromOffset(22, 22), Parent = tg.row,
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 6) }) })
+
+	for i = 1, 3 do
+		local y = 5 + (i - 1) * 5
 		new("Frame", {
-			Name = "xarm", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.new(0.5, -1, 0.5, i == 1 and -2.5 or 2.5),
-			Size = UDim2.fromOffset(7, 1.5), Rotation = i == 1 and 45 or -45,
-			BackgroundColor3 = T.muted, BorderSizePixel = 0, Parent = btn,
+			Name = "gearTrack", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(11, y),
+			Size = UDim2.fromOffset(11, 1.5), BackgroundColor3 = T.muted, BorderSizePixel = 0, Parent = btn,
 		})
+		new("Frame", {
+			Name = "gearKnob", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromOffset(GEAR_KNOB_X[i], y),
+			Size = UDim2.fromOffset(4, 4), BackgroundColor3 = T.muted, BorderSizePixel = 0, Parent = btn,
+		}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 	end
+
+	local function paint(col, bg)
+		for _, a in ipairs(btn:GetChildren()) do
+			if a.Name == "gearTrack" or a.Name == "gearKnob" then tween(a, 0.15, { BackgroundColor3 = col }) end
+		end
+		tween(btn, 0.15, { BackgroundTransparency = bg })
+	end
+	btn.MouseEnter:Connect(function() paint(T.text, 0.55) end)
+	btn.MouseLeave:Connect(function() paint(T.muted, 1) end)
+
 	btn.MouseButton1Click:Connect(function() openConfig(cfg) end)
 	return btn
 end

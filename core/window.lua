@@ -37,7 +37,12 @@ local wCorner = window:FindFirstChildOfClass("UICorner")
 A.windowCorner = wCorner and wCorner.CornerRadius.Offset or 19
 A.shadowPad = PAD
 new("UICorner", { CornerRadius = UDim.new(0, A.windowCorner + PAD), Parent = shadow })
+-- The sheen is a square frame laid over a rounded shell. CanvasGroup does not
+-- clip its children, so its corners used to stick out past the window's arc;
+-- the same radius keeps it inside, and the gradient is already clear at the
+-- bottom, so the corners it rounds there are invisible anyway.
 new("Frame", { Name = "sheen", Size = UDim2.fromScale(1, 0.45), BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, Active = false, Parent = window }, {
+	new("UICorner", { CornerRadius = UDim.new(0, A.windowCorner) }),
 	new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.9), NumberSequenceKeypoint.new(1, 1) }) }),
 })
 

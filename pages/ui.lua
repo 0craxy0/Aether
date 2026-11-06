@@ -23,7 +23,10 @@ local function rsApplySize(nw, nh)
 	for _, u in ipairs(uiScales) do u.Scale = sc end
 	A.W, A.H = nw / sc, nh / sc
 	window.Size = UDim2.fromOffset(A.W, A.H)
-	shadow.Size = UDim2.fromOffset(RS.vw + 44, RS.vh + 44)
+	-- the shadow's inset comes from A.shadowPad; hardcoding 44 here meant a change
+	-- to that pad would silently leave the two rectangles out of step
+	local spad = (A.shadowPad or 22) * 2
+	shadow.Size = UDim2.fromOffset(RS.vw + spad, RS.vh + spad)
 	-- the window's corners scale with the contents, so the shadow's curve has to follow
 	local sCorner = shadow:FindFirstChildOfClass("UICorner")
 	if sCorner then

@@ -25,13 +25,24 @@ A.toastLayer = toastLayer
 function A.notify(title, body, kind)
 	local accent = kind == "bad" and T.bad or kind == "good" and T.good or T.accent
 
-	local card = new("Frame", {
+	-- A CanvasGroup, so GroupTransparency can fade the whole card on the way out.
+	-- As a plain Frame only the background faded: the text stayed fully opaque
+	-- until the toast was destroyed, which read as a hard cut.
+	local card = new("CanvasGroup", {
 		Size = UDim2.new(1, 0, 0, 54), BackgroundColor3 = T.raised,
-		BackgroundTransparency = 0.06, ClipsDescendants = true, Parent = toastLayer,
+		BackgroundTransparency = 0.06, GroupTransparency = 0, ClipsDescendants = true, Parent = toastLayer,
 	})
 	corner(card, 8)
 	stroke(card, T.stroke, 0.35)
-	new("Frame", { Size = UDim2.fromOffset(3, 34), Position = UDim2.fromOffset(0, 10), BackgroundColor3 = accent, BackgroundTransparency = 1, BorderSizePixel = 0, Parent = card }, { new("UICorner", { CornerRadius = UDim.new(0, 3) }) })
+
+	-- the intent bar: created clear and brought in, it never appeared at all
+	local bar = new("Frame", { Size = UDim2.fromOffset(3, 34), Position = UDim2.fromOffset(0, 10), BackgroundColor3 = accent, BackgroundTransparency = 1, BorderSizePixel = 0, Parent = card }, {
+		new("UICorner", { CornerRadius = UDim.new(0, 3) }),
+		new("UIGradient", { Rotation = 90, Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 0.35),
+		}) }),
+	})
+	tween(bar, 0.35, { BackgroundTransparency = 0 })
 
 	label({ Text = title, Font = FONT.bold, TextSize = 12, Position = UDim2.fromOffset(13, 9), Size = UDim2.new(1, -24, 0, 14), Parent = card })
 	label({ Text = body or "", TextColor3 = T.muted, TextSize = 11, Position = UDim2.fromOffset(13, 26), Size = UDim2.new(1, -24, 0, 26), TextWrapped = true, Parent = card })
@@ -42,7 +53,7 @@ function A.notify(title, body, kind)
 	task.delay(3.6, function()
 		if card and card.Parent then
 			tween(pop, 0.3, { Scale = 0.6 })
-			tween(card, 0.3, { BackgroundTransparency = 1 })
+			tween(card, 0.3, { GroupTransparency = 1 })
 			task.wait(0.22)
 			card:Destroy()
 		end
