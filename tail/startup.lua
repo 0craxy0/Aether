@@ -4,6 +4,10 @@ local window, shadow, UI = A.window, A.shadow, A.UI
 local closeBtn, searchBox = A.closeBtn, A.searchBox
 local keybinds = A.keybinds
 local UserInputService = A.UserInputService
+
+-- getgenv().AetherDebug = true before executing prints what every shortcut resolves
+-- to and what the show/hide decided, so a broken bind is diagnosable from the console
+local DEBUG = getgenv and getgenv().AetherDebug == true
 local shadowAlpha = shadow.ImageTransparency -- restore what core/window.lua chose
 
 -- show / hide ----------------------------------------------------
@@ -15,6 +19,12 @@ local function bindName(action)
 	for k, n in pairs(keybinds) do
 		if n == action then return k end
 	end
+end
+
+local function anyVisible()
+	if window.Visible then return true end
+	if UI.active and UI.active.frame.Visible then return true end
+	return false
 end
 
 function A.toggleUI()
@@ -31,9 +41,36 @@ function A.toggleUI()
 		end
 		return
 	end
-	hidden = not hidden
-	sfx(hidden and "close" or "open")
-	if hidden then
+
+	-- Decide from what is actually on screen, not from a flag that can drift out of
+	-- step with it. A desynced `hidden` made this hide something already hidden,
+	-- which reads exactly like "the shortcut does nothing". Now any state where the
+	-- panel is not visible means the next press shows it.
+	local show = hidden or not anyVisible()
+	hidden = not show
+	if DEBUG then
+		print(string.format("[Aether] toggleUI show=%s visible=%s", tostring(show), tostring(anyVisible())))
+	end
+	sfx(show and "open" or "close")
+
+	if show then
+		-- Restore only what is still a legitimate target. A config menu's frame is
+		-- built once and hidden, never destroyed, so a stale hiddenTarget would bring
+		-- back the settings sheet with the main window still invisible behind it.
+		local target = hiddenTarget
+		local live = target and target.Parent and (target == window or (UI.active and UI.active.frame == target))
+		if not live then
+			target = window
+			hiddenTarget = nil
+		end
+		local full = target.Size
+		target.Size = UDim2.fromOffset(full.X.Offset * 0.8, full.Y.Offset * 0.8)
+		target.GroupTransparency = 1
+		target.Visible = true
+		shadow.Visible = true
+		tween(target, 0.8, { Size = full, GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
+		tween(shadow, 0.3, { ImageTransparency = shadowAlpha })
+	else
 		local target = UI.active and UI.active.frame or window
 		hiddenTarget = target
 		-- A TextBox that still holds focus makes UserInputService:GetFocusedTextBox()
@@ -51,23 +88,6 @@ function A.toggleUI()
 		end)
 		local key = bindName("Toggle UI")
 		notify("Aether hidden", key and ("press " .. key .. " to show") or "no key bound to show it again")
-	else
-		-- Restore only what is still a legitimate target. A config menu's frame is
-		-- built once and hidden, never destroyed, so a stale hiddenTarget would bring
-		-- back the settings sheet with the main window still invisible behind it.
-		local target = hiddenTarget
-		local live = target and target.Parent and (target == window or (UI.active and UI.active.frame == target))
-		if not live then
-			target = window
-			hiddenTarget = nil
-		end
-		local full = target.Size
-		target.Size = UDim2.fromOffset(full.X.Offset * 0.8, full.Y.Offset * 0.8)
-		target.GroupTransparency = 1
-		target.Visible = true
-		shadow.Visible = true
-		tween(target, 0.8, { Size = full, GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
-		tween(shadow, 0.3, { ImageTransparency = shadowAlpha })
 	end
 end
 

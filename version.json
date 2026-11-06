@@ -1,6 +1,6 @@
 {
-  "rev": 18,
-  "build": "2026-11-06.18",
-  "notes": "Announcements can now come from the version Worker instead of a committed file: one authenticated POST publishes a note that every client sees within 15s, with announcements.json kept as the offline floor.",
+  "rev": 19,
+  "build": "2026-11-06.19",
+  "notes": "Toggle UI rewritten to trust what is on screen instead of a shadow flag, so any state where the panel is not visible makes the next press show it. Shortcut dispatch reads the live bind map (the per-frame snapshot could miss a key), a capture now expires instead of latching, and a blank saved bind can no longer swallow a key. getgenv().AetherDebug prints what every key resolves to.",
   "loader": "main.lua"
 }

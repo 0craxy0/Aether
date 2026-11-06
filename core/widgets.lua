@@ -9,6 +9,7 @@ local accentLinks = {}   -- objects that repaint on accent change
 local KB = {
 	active = {}, index = {}, onToggle = function(_name, _v) end,
 	listening = false, -- true while a keybind row is waiting for a key
+	captureAt = nil,   -- os.clock() when that started, so a stale capture expires
 	bindings = {},     -- bind name -> { clear }, so a key can only belong to one row
 	binds = { ["Fly"] = "Toggle fly", ["Aimbot"] = "Toggle aimbot", ["Silent aim"] = "Toggle silent aim", ["Kill aura"] = "Toggle kill aura" },
 }
@@ -364,6 +365,11 @@ function A.keybind(parent, name, default)
 
 	-- the only writer of the keybinds map, so a key can never point at two rows
 	local function apply(newKey)
+		-- A blank or placeholder value must never become a bind: keybinds[""] would
+		-- sit in the map looking bound, show nothing in the row, and swallow the key.
+		if newKey ~= nil and (type(newKey) ~= "string" or newKey == "" or newKey == "—") then
+			newKey = nil
+		end
 		local other = newKey and keybinds[newKey]
 		if other and other ~= name then
 			local o = KB.bindings[other]
@@ -386,29 +392,44 @@ function A.keybind(parent, name, default)
 	b.MouseButton1Click:Connect(function()
 		listening = true
 		KB.listening = true -- tail/keybinds.lua must not also fire the key being replaced
+		-- a deadline, not just a flag: a capture that never receives a key used to
+		-- leave every shortcut dead for the rest of the session
+		KB.captureAt = os.clock()
 		tween(b, 0.12, { BackgroundColor3 = T.accent })
 		b.Text = "…"
 	end)
 
 	local conn = UserInputService.InputBegan:Connect(function(i)
 		if not listening then return end
-		listening = false
-		-- KB.listening has to outlive this input pass. tail/keybinds.lua connects its
-		-- dispatcher *after* this handler, so clearing the flag here let the very key
-		-- being bound also fire the action it was being bound to: capturing "Toggle UI"
-		-- and pressing its own key hid the panel as a side effect.
-		task.defer(function() KB.listening = false end)
-		tween(b, 0.15, { BackgroundColor3 = T.stroke })
-		-- Only a keyboard key can ever fire: tail/keybinds.lua listens to
-		-- Keyboard input alone. Capturing a mouse button stored a name nothing
-		-- reads, so the row looked bound and did nothing. A stray click cancels
-		-- the capture and leaves the previous key in place.
-		if i.UserInputType ~= Enum.UserInputType.Keyboard then
+		-- same deadline the dispatcher uses: a capture nobody answered must not eat
+		-- the next key the user presses an hour later
+		if not KB.captureAt or os.clock() - KB.captureAt >= 8 then
+			listening = false
+			KB.listening = false
+			KB.captureAt = nil
+			tween(b, 0.15, { BackgroundColor3 = T.stroke })
 			b.Text = key or "—"
 			return
 		end
+		if i.UserInputType ~= Enum.UserInputType.Keyboard then
+			-- a click elsewhere cancels the capture and keeps the previous key
+			listening = false
+			KB.listening = false
+			KB.captureAt = nil
+			tween(b, 0.15, { BackgroundColor3 = T.stroke })
+			b.Text = key or "—"
+			return
+		end
+		listening = false
+		tween(b, 0.15, { BackgroundColor3 = T.stroke })
 		apply(i.KeyCode.Name)
 		if A.touch then A.touch() end
+		-- cleared last and on the next frame: the dispatcher in tail/keybinds.lua is
+		-- connected after this handler, so it must still see the capture as active
+		task.defer(function()
+			KB.listening = false
+			KB.captureAt = nil
+		end)
 	end)
 	A.onCleanup(function() conn:Disconnect() end)
 

@@ -45,28 +45,28 @@ local actions = {
 	["Teleport to cursor"] = function() A.tpToCursor() end,
 }
 
--- binds as they stood last frame: a key that was only just assigned
--- (rebinding) must not also fire its action
-local snap = {}
-local snapConn = RunService.Heartbeat:Connect(function()
-	table.clear(snap)
-	for k, n in pairs(keybinds) do snap[k] = n end
-end)
+-- Binds are read from the live map. The old version compared against a snapshot
+-- rebuilt every Heartbeat, which meant a bind that existed but had not made it into
+-- the snapshot yet simply did not fire - one of the ways this went quiet.
+local CAPTURE_TTL = 8 -- a capture older than this is abandoned, never latched
+local DEBUG = getgenv and getgenv().AetherDebug == true
 
 local inputConn = UserInputService.InputBegan:Connect(function(i, gp)
 	if gp or i.UserInputType ~= Enum.UserInputType.Keyboard then return end
-	if KB.listening then return end -- that keypress is being assigned to a row, not fired
+	-- that keypress is being assigned to a row, not fired
+	if KB.captureAt and os.clock() - KB.captureAt < CAPTURE_TTL then return end
 	if UserInputService:GetFocusedTextBox() then return end
-	local name = snap[i.KeyCode.Name]
-	-- the bind map is authoritative: when the snapshot disagrees, the key was rebound
-	-- this frame and firing it would run the row that no longer owns it
-	if name and keybinds[i.KeyCode.Name] ~= name then name = nil end
+
+	local name = keybinds[i.KeyCode.Name]
 	local fn = name and actions[name]
+	if DEBUG then
+		print(string.format("[Aether] key %s -> %s", i.KeyCode.Name, tostring(name or "unbound")))
+	end
 	if fn then
 		local ok, err = pcall(fn)
 		if not ok then A.notify(name, tostring(err), "bad") end
 	end
 end)
-onCleanup(function() snapConn:Disconnect(); inputConn:Disconnect() end)
+onCleanup(function() inputConn:Disconnect() end)
 
 A.stage("8 keybinds done")
