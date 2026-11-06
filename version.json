@@ -1,6 +1,6 @@
 {
-  "rev": 26,
-  "build": "2026-11-06.26",
-  "notes": "Vertical tracking in the colour picker is measured from the runtime instead of assumed: the topbar offset is derived from the screen and viewport heights, and falls back to learning it from the first click.",
+  "rev": 27,
+  "build": "2026-11-06.27",
+  "notes": "Silent aim fixes: rays now reach targets farther than the original ray, the wall check stops erroring when your character is respawning, Mixed no longer drops shots when the head is missing, Random re-rolls per shot, and Mouse.Hit keeps its direction.",
   "loader": "main.lua"
 }

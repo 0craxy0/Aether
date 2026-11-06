@@ -48,9 +48,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-06.26"
+local BUILD = "2026-11-06.27"
 -- monotonic: the updater compares rev, never the date string
-local REV = 26
+local REV = 27
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache

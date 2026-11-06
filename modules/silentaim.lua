@@ -91,7 +91,12 @@ local function saEvaluate(plr, cam, origin, ignoreFov)
 	local d2 = (screenPos - origin).Magnitude
 	if not ignoreFov and d2 > s.fov and not TF.black[plr.UserId] then return nil end
 	if s.wallCheck then
-		saParams.FilterDescendantsInstances = { LP.Character, c }
+		-- nil in this list is not "ignore nothing", it is an argument error on the
+		-- next Raycast: LP.Character is nil for the frame or two after a respawn
+		local ignore = {}
+		if LP.Character then ignore[#ignore + 1] = LP.Character end
+		ignore[#ignore + 1] = c
+		saParams.FilterDescendantsInstances = ignore
 		if workspace:Raycast(cam.CFrame.Position, part.Position - cam.CFrame.Position, saParams) then return nil end
 	end
 	local metric = d2
@@ -111,13 +116,23 @@ function SA.aimPos()
 		SA.rollOk = math.random(100) <= s.hitChance
 		SA.rollHead = math.random(100) <= s.headChance
 		SA.rollOff = Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * 2 * s.spread
+		-- the random part was only re-rolled when the target changed, so picking
+		-- "Random" pinned every shot at one player to whichever limb came up first
+		SA.randIdx = math.random(1, 4)
 	end
 	if not SA.rollOk then return nil end
 	local c = t.plr.Character
 	if not c then return nil end
 	local part = t.part
-	if s.part == "Mixed" then
-		part = SA.rollHead and c:FindFirstChild("Head") or t.part
+	if s.part == "Mixed" and SA.rollHead then
+		-- a missing head used to make part nil and drop the whole shot, even with
+		-- a perfectly good torso available
+		part = c:FindFirstChild("Head") or part
+	end
+	if not part or not part.Parent then
+		-- the cached part was destroyed under us (respawn, ragdoll re-parent): look
+		-- it up again on the same character rather than silently not aiming
+		part = saPickPart(c, workspace.CurrentCamera, SA.origin or Vector2.zero) or c:FindFirstChild("HumanoidRootPart")
 	end
 	if not part or not part.Parent then return nil end
 	local pos = part.Position
@@ -142,7 +157,11 @@ function SA.process(self, method, ...)
 			local delta = pos - origin
 			if delta.Magnitude < 1e-3 then return end
 			local a = table.pack(...)
-			a[2] = delta.Unit * dir.Magnitude
+			-- keep the original reach unless it is too short to arrive: a ray that
+			-- stops 40 studs out re-aimed at a player 120 studs away simply misses,
+			-- which reads as "silent aim doesn't work on far targets"
+			local reach = math.max(dir.Magnitude, delta.Magnitude)
+			a[2] = delta.Unit * reach
 			return "args", a
 		elseif SA_FIND[method] then
 			if not s.mFindPart then return end
@@ -153,7 +172,8 @@ function SA.process(self, method, ...)
 			local a = table.pack(...)
 			local d = pos - ray.Origin
 			if d.Magnitude < 1e-3 then return end
-			a[1] = Ray.new(ray.Origin, d.Unit * ray.Direction.Magnitude)
+			local reach = math.max(ray.Direction.Magnitude, d.Magnitude)
+			a[1] = Ray.new(ray.Origin, d.Unit * reach)
 			return "args", a
 		end
 	elseif s.mScreenRay and (method == "ScreenPointToRay" or method == "ViewportPointToRay") and self == workspace.CurrentCamera then
@@ -198,7 +218,19 @@ function SA.install()
 			and (key == "Hit" or key == "Target") and not checkcaller() then
 			local ok, pos, part = pcall(cur.aimPos)
 			if ok and pos then
-				if key == "Hit" then return CFrame.new(pos) end
+				if key == "Hit" then
+					-- keep the direction the real mouse was pointing: a bare
+					-- CFrame.new(pos) has a zero LookVector, so anything that builds a
+					-- projectile from Hit.LookVector fires nowhere
+					local base = oldIndex(self, "Hit")
+					if typeof(base) == "CFrame" then
+						local look = base.LookVector
+						if look.Magnitude > 1e-3 then
+							return CFrame.lookAt(pos, pos + look)
+						end
+					end
+					return CFrame.new(pos)
+				end
 				return part
 			end
 		end
@@ -254,6 +286,7 @@ function SA.start()
 		local s = SA.s
 		local origin = UserInputService:GetMouseLocation()
 		if s.fovOrigin == "Center" then origin = cam.ViewportSize / 2 end
+		SA.origin = origin -- aimPos re-picks parts against this when one is destroyed
 
 		local newT
 		if saKeyHeld() then
@@ -269,7 +302,6 @@ function SA.start()
 				end
 			end
 		end
-		if newT and (not SA.target or SA.target.plr ~= newT.plr) then SA.randIdx = math.random(1, 4) end
 		SA.target = newT
 
 		if SA.circle then
