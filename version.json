@@ -1,6 +1,6 @@
 {
-  "rev": 22,
-  "build": "2026-11-06.22",
-  "notes": "Release notes can be published from the admin panel: title, body and whether they decorate this build or stand alone. The update dialog is the same one, with your words in it.",
+  "rev": 23,
+  "build": "2026-11-06.23",
+  "notes": "Accent color is a real picker now: drag a saturation/value square, slide the hue strip, or type a hex code. The old named swatches still load from an existing config.",
   "loader": "main.lua"
 }

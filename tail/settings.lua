@@ -6,12 +6,13 @@ local accentLinks = A.accentLinks
 local toggle, button, dropdown = A.toggle, A.button, A.dropdown
 
 -- accent colour ---------------------------------------------------
+-- The picker stores a hex string. These names are kept only so a config written
+-- by the old named-swatch dropdown still loads as the colour it meant.
 local ACCENTS = {
 	Blue = Color3.fromHex("0A84FF"), Teal = Color3.fromHex("64D2FF"), Green = Color3.fromHex("30D158"),
 	Purple = Color3.fromHex("BF5AF2"), Pink = Color3.fromHex("FF375F"), Orange = Color3.fromHex("FF9F0A"),
 	Red = Color3.fromHex("FF453A"),
 }
-local ACCENT_NAMES = { "Blue", "Teal", "Green", "Purple", "Pink", "Orange", "Red" }
 
 function A.setAccent(c)
 	T.accent = c
@@ -112,9 +113,9 @@ local pSet = A.makePage("Settings", 8)
 A.pageSettings = pSet -- tail/updater.lua adds the Update section to it
 
 local sLook = pSet.section("Appearance", 1)
-dropdown(sLook, "Accent color", ACCENT_NAMES, "Blue", function(v)
-	if ACCENTS[v] then A.setAccent(ACCENTS[v]) end
-end)
+A.colorPicker(sLook, "Accent color", ACCENTS.Blue or Color3.fromHex("0A84FF"), function(c)
+	A.setAccent(c)
+end, ACCENTS)
 
 local sCfg = pSet.section("Config", 2)
 toggle(sCfg, "Auto-save on change", true, function(v) A.autoSave = v end)
