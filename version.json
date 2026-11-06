@@ -1,6 +1,6 @@
 {
-  "rev": 14,
-  "build": "2026-11-06.14",
-  "notes": "Counter projectile gravity: one gravity step is added back to every projectile part each physics frame, so shots fly straight instead of dropping. Combat page gains a Projectiles section with strength and speed threshold.",
+  "rev": 15,
+  "build": "2026-11-06.15",
+  "notes": "Announcements: a read-only note the owner publishes as announcements.json on the loader's own origin, shown in the toast layer with a per-user switch. Owner panel on the author's account only, exposing the update check and restart that already exist.",
   "loader": "main.lua"
 }

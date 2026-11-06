@@ -46,6 +46,41 @@ A.tts.backend = function(text)
 end
 ```
 
+## announcements
+
+`announcements.json` sits next to `version.json` on the same origin the loader
+already trusts. `tail/announcements.lua` reads it on the update poll (self-throttled
+to five minutes), shows anything not yet seen in the toast layer, and remembers seen
+ids in the config so a note is not repeated.
+
+```json
+{
+  "items": [
+    { "id": "2026-11-06-a", "text": "Double XP this weekend.", "kind": "good" }
+  ]
+}
+```
+
+`id` is what makes a note appear once, so keep it stable. `kind` is `good`, `bad`
+or omitted. Each notice is capped at 220 characters and three are shown per check.
+
+This is one-way by design: the client fetches **text** and displays it. It accepts
+no command, no URL to run, no id to target - a note can never make a client do
+anything. Users own the switch on the UI page (*Show announcements*), and turning
+it off stops the fetch entirely.
+
+## owner panel
+
+`tail/admin.lua` builds an extra page for one account (`1562524075`) and returns
+immediately for everyone else. It is a local comparison on a local value: no
+hardware id is read, stored or sent, and no other client is contacted.
+
+What it gives that account: force an update check, restart into the latest build,
+re-read the announcements file, reset the seen list, copy the JSON template, and
+see the executor / build / rev it is running. Every one of those is a control over
+*this* instance of the script - the same actions the Settings page already offers -
+just collected in one place.
+
 ## updating
 
 `tail/updater.lua` reads `version.json` every 15s (Settings > Updates) and compares
@@ -111,5 +146,7 @@ Aether/
     ├── tts.lua               read-aloud: hover, progress bar, first-run prompt
     ├── keybinds.lua          key handlers and the Keybinds page
     ├── updater.lua           update check, prompt, restart
+    ├── announcements.lua     read-only notes from announcements.json
+    ├── admin.lua             owner panel (one account, local check only)
     └── startup.lua           show/hide, search, startup animation
 ```

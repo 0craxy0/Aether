@@ -147,6 +147,43 @@ local function openDialog(info)
 	tween(card, 0.24, { GroupTransparency = 0 })
 end
 
+-- restart --------------------------------------------------------
+-- Tear the running UI down through the same path the Unload button uses, then
+-- fetch and run the loader again; it replays the config on the way back up.
+-- A.unload is this instance's own teardown - _G.AetherUnload is writable by any
+-- other script in the executor and would be called right here.
+function U.restart()
+	task.spawn(function()
+		A.sfx("close")
+		if type(A.unload) == "function" then pcall(A.unload) end
+		task.wait(0.15)
+		local url = A.base .. "main.lua?t=" .. tostring(os.time())
+		local okGet, src = pcall(game.HttpGet, game, url)
+		if not okGet or type(src) ~= "string" or #src > (2 * 1024 * 1024) then
+			return warn("[Aether] restart failed: could not download main.lua: " .. tostring(src))
+		end
+		local fn, err = loadstring(src, "@main.lua")
+		if not fn then return warn("[Aether] restart failed: " .. tostring(err)) end
+		local okRun, runErr = pcall(fn)
+		if not okRun then warn("[Aether] restart failed: " .. tostring(runErr)) end
+	end)
+end
+
+-- a check the user or the owner panel asked for, bypassing the cooldown
+function U.checkNow()
+	U.dismissed = {}
+	U.quietUntil = 0
+	U.nextCheck = 0
+	local info = check()
+	if info then
+		U.quietUntil = os.clock() + U.cooldown
+		openDialog(info)
+		return true
+	end
+	notify("Updates", "up to date", "good")
+	return false
+end
+
 -- apply ----------------------------------------------------------
 function U.apply(info)
 	closeDialog()
@@ -159,24 +196,7 @@ function U.apply(info)
 		return
 	end
 
-	task.spawn(function()
-		A.sfx("close")
-		-- tear the old UI down through the same path the Unload button uses, then
-		-- run the loader again; it replays the config on the way back up. A.unload
-		-- is this instance's own teardown - _G.AetherUnload is writable by any
-		-- other script in the executor and would be called right here.
-		if type(A.unload) == "function" then pcall(A.unload) end
-		task.wait(0.15)
-		local url = A.base .. "main.lua?t=" .. tostring(os.time())
-		local okGet, src = pcall(game.HttpGet, game, url)
-		if not okGet or type(src) ~= "string" then
-			return warn("[Aether] update failed: could not download main.lua: " .. tostring(src))
-		end
-		local fn, err = loadstring(src, "@main.lua")
-		if not fn then return warn("[Aether] update failed: " .. tostring(err)) end
-		local okRun, runErr = pcall(fn)
-		if not okRun then warn("[Aether] update failed: " .. tostring(runErr)) end
-	end)
+	U.restart()
 end
 
 -- settings rows --------------------------------------------------
@@ -188,18 +208,7 @@ if pSet then
 		U.interval = ({ ["15s"] = 15, ["30s"] = 30, ["1 min"] = 60, ["5 min"] = 300 })[v] or 15
 		U.nextCheck = 0
 	end)
-	button(sUpd, "Check now", "CHECK", function()
-		U.dismissed = {}
-		U.quietUntil = 0
-		U.nextCheck = 0
-		local info = check()
-		if info then
-			U.quietUntil = os.clock() + U.cooldown
-			openDialog(info)
-		else
-			notify("Updates", "up to date", "good")
-		end
-	end)
+	button(sUpd, "Check now", "CHECK", function() U.checkNow() end)
 end
 
 -- loop -----------------------------------------------------------
@@ -214,6 +223,8 @@ end)
 task.spawn(function()
 	while running do
 		task.wait(1)
+		-- self-throttled to its own interval; rides this loop instead of a second one
+		if running and A.announce then A.announce.check() end
 		if running and U.enabled then
 			local now = os.clock()
 			if now >= U.nextCheck and now >= U.quietUntil then
