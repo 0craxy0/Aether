@@ -27,7 +27,10 @@ function A.hop()
 		return game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
 	end)
 	if not ok then return notify("Server hop", "request failed", "bad") end
-	local data = HttpService:JSONDecode(res)
+	local decoded, data = pcall(function() return HttpService:JSONDecode(res) end)
+	if not decoded or type(data) ~= "table" then
+		return notify("Server hop", "unexpected response", "bad")
+	end
 	local pool = {}
 	for _, s in ipairs(data.data or {}) do
 		if s.id ~= game.JobId and s.playing < s.maxPlayers then pool[#pool + 1] = s.id end

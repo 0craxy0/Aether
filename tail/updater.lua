@@ -23,26 +23,27 @@ local U = {
 A.updater = U
 
 local function fetch()
-	local url, body
-	if U.api then
-		-- a custom endpoint gets the running version in the body and answers with
-		-- the same JSON shape the static file has
-		url = U.api
-		body = HttpService:JSONEncode({ rev = A.rev or 0, build = tostring(A.build or "?") })
-	else
-		-- bucket per minute: keeps the CDN useful without ever hiding a push for long
-		url = A.base .. U.json .. "?t=" .. tostring(math.floor(os.time() / 60))
+	local req = (syn and syn.request) or (fluxus and fluxus.request) or http_request or request
+
+	-- The POST endpoint is the optional path, and it is only reachable through an
+	-- executor `request` function. Without one this used to fall through to a GET
+	-- of the same URL, which the endpoint does not answer, so every check failed
+	-- to decode and reported "up to date" forever. Try it, verify it, and fall
+	-- back to the static file the loader already trusts.
+	if U.api and req then
+		local ok, res = pcall(req, {
+			Url = U.api, Method = "POST",
+			Headers = { ["Content-Type"] = "application/json" },
+			Body = HttpService:JSONEncode({ rev = A.rev or 0, build = tostring(A.build or "?") }),
+		})
+		if ok and type(res) == "table" and type(res.Body) == "string" and res.Body ~= "" then
+			local okDecode, data = pcall(function() return HttpService:JSONDecode(res.Body) end)
+			if okDecode and type(data) == "table" and tonumber(data.rev) then return res.Body end
+		end
 	end
 
-	local req = (syn and syn.request) or (fluxus and fluxus.request) or http_request or request
-	if body and req then
-		local ok, res = pcall(req, {
-			Url = url, Method = "POST",
-			Headers = { ["Content-Type"] = "application/json" },
-			Body = body,
-		})
-		if ok and type(res) == "table" and res.Body then return res.Body end
-	end
+	-- bucket per minute: keeps the CDN useful without ever hiding a push for long
+	local url = A.base .. U.json .. "?t=" .. tostring(math.floor(os.time() / 60))
 	local ok, res = pcall(game.HttpGet, game, url)
 	if ok and type(res) == "string" then return res end
 	return nil
