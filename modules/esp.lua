@@ -254,7 +254,7 @@ function ESP.start()
 				set.hpBg.Size = Vector2.new(2, h)
 				set.hp.Position = Vector2.new(x - 5, y + h * (1 - frac))
 				set.hp.Size = Vector2.new(2, h * frac)
-				set.hp.Color = frac > 0.5 and T.good or frac > 0.25 and Color3.fromRGB(240, 190, 60) or T.bad
+				set.hp.Color = frac > 0.5 and T.good or frac > 0.25 and T.warn or T.bad
 			end
 			set.hpText.Visible = S.healthText
 			if S.healthText then
