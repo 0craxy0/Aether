@@ -3,11 +3,13 @@ local tween, notify, sfx = A.tween, A.notify, A.sfx
 local window, shadow, UI = A.window, A.shadow, A.UI
 local closeBtn, searchBox = A.closeBtn, A.searchBox
 local keybinds = A.keybinds
+local UserInputService = A.UserInputService
 local shadowAlpha = shadow.ImageTransparency -- restore what core/window.lua chose
 
 -- show / hide ----------------------------------------------------
 local hidden = false
 local hiddenTarget = nil
+local toggleRetry = false
 
 local function bindName(action)
 	for k, n in pairs(keybinds) do
@@ -16,24 +18,49 @@ local function bindName(action)
 end
 
 function A.toggleUI()
-	if UI.busy then return end
+	if UI.busy then
+		-- A config menu is mid-transition. Dropping the press here was the difference
+		-- between "the panel is open" and "the panel can never open again", since this
+		-- is also the only control that shows it. Wait for it to settle, once.
+		if not toggleRetry then
+			toggleRetry = true
+			task.delay(0.3, function()
+				toggleRetry = false
+				A.toggleUI()
+			end)
+		end
+		return
+	end
 	hidden = not hidden
 	sfx(hidden and "close" or "open")
 	if hidden then
 		local target = UI.active and UI.active.frame or window
 		hiddenTarget = target
+		-- A TextBox that still holds focus makes UserInputService:GetFocusedTextBox()
+		-- non-nil, and the dispatcher drops every key while that is true - including
+		-- the one that would bring the panel back. Let go of it as we hide.
+		local box = UserInputService:GetFocusedTextBox()
+		if box then pcall(function() box:ReleaseFocus() end) end
 		tween(target, 0.2, { GroupTransparency = 1 })
 		tween(shadow, 0.2, { ImageTransparency = 1 })
 		task.delay(0.2, function()
 			if hidden then
-				target.Visible = false
+				if target.Parent then target.Visible = false end
 				shadow.Visible = false
 			end
 		end)
 		local key = bindName("Toggle UI")
 		notify("Aether hidden", key and ("press " .. key .. " to show") or "no key bound to show it again")
 	else
-		local target = hiddenTarget or window
+		-- Restore only what is still a legitimate target. A config menu's frame is
+		-- built once and hidden, never destroyed, so a stale hiddenTarget would bring
+		-- back the settings sheet with the main window still invisible behind it.
+		local target = hiddenTarget
+		local live = target and target.Parent and (target == window or (UI.active and UI.active.frame == target))
+		if not live then
+			target = window
+			hiddenTarget = nil
+		end
 		local full = target.Size
 		target.Size = UDim2.fromOffset(full.X.Offset * 0.8, full.Y.Offset * 0.8)
 		target.GroupTransparency = 1

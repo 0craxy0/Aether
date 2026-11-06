@@ -393,7 +393,11 @@ function A.keybind(parent, name, default)
 	local conn = UserInputService.InputBegan:Connect(function(i)
 		if not listening then return end
 		listening = false
-		KB.listening = false
+		-- KB.listening has to outlive this input pass. tail/keybinds.lua connects its
+		-- dispatcher *after* this handler, so clearing the flag here let the very key
+		-- being bound also fire the action it was being bound to: capturing "Toggle UI"
+		-- and pressing its own key hid the panel as a side effect.
+		task.defer(function() KB.listening = false end)
 		tween(b, 0.15, { BackgroundColor3 = T.stroke })
 		-- Only a keyboard key can ever fire: tail/keybinds.lua listens to
 		-- Keyboard input alone. Capturing a mouse button stored a name nothing
