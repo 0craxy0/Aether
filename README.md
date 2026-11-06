@@ -24,6 +24,28 @@ The panel is built to behave like an object, not a picture:
 
 All four are switchable on the UI page, and none of them touch a module's state.
 
+## read aloud
+
+Off until you say otherwise. A first-run card asks once; a "yes" is remembered
+whatever the checkbox says, and a "no" only if *Don't show this again* is ticked.
+The same thing lives as a normal switch on the UI page, so it can be turned on or
+off at any time without the card coming back.
+
+Point at any label and hold for three seconds. A bar grows out of the middle of
+that text toward both edges while the wait runs; when it lands the text is read
+out. Move off, or onto another label, and it starts over.
+
+The voice is a backend, because a client script has no speech synthesiser: `Sound`
+plays `rbxassetid://` assets only, so nothing here can turn arbitrary text into
+audio by itself. `tail/tts.lua` ships a quiet fallback (one soft tone per word) and
+calls out through `A.tts.backend` when one is set:
+
+```lua
+A.tts.backend = function(text)
+    -- hand text to a real synthesiser here, then play what it returns
+end
+```
+
 ## updating
 
 `tail/updater.lua` reads `version.json` every 15s (Settings > Updates) and compares
@@ -86,6 +108,7 @@ Aether/
     ├── hud.lua               stats HUD: fps, ping, players
     ├── glass.lua             glass blur and Liquid Glass
     ├── settings.lua          accent colour, config save/load, session actions
+    ├── tts.lua               read-aloud: hover, progress bar, first-run prompt
     ├── keybinds.lua          key handlers and the Keybinds page
     ├── updater.lua           update check, prompt, restart
     └── startup.lua           show/hide, search, startup animation

@@ -90,4 +90,8 @@ tween(window, 0.8, { Size = UDim2.fromOffset(A.W, A.H), GroupTransparency = 0 },
 
 local key = bindName("Toggle UI")
 notify("Aether loaded", key and ("press " .. key .. " to hide or show") or "ready", "good")
+
+-- after the entrance settles, so the question is not competing with the animation
+if A.tts then task.delay(0.7, A.tts.maybePrompt) end
+
 A.stage("9 startup done")

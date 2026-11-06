@@ -1,6 +1,6 @@
 {
-  "rev": 11,
-  "build": "2026-11-06.11",
-  "notes": "Stats HUD, auto-saving config, anti-void, plus hardening: auto-execute only queues this loader's own host, downloads are size-capped, unload no longer goes through a writable global, and silent aim cannot emit NaN rays.",
+  "rev": 12,
+  "build": "2026-11-06.12",
+  "notes": "Read aloud: hover any label for three seconds, with a bar growing from the middle of the text to its edges as the wait runs. First-run card asks once, remembered on yes regardless of the checkbox. Config gains reserved extras for values that are not widget rows.",
   "loader": "main.lua"
 }

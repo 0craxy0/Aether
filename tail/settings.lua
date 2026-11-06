@@ -29,6 +29,17 @@ end
 -- config save / load (replaces the placeholders from modules/actions.lua) --
 local FOLDER, FILE = "Aether", "Aether/config.json"
 
+-- persisted values that are not widget rows (the read-aloud prompt decision, for
+-- one). One reserved key holds them all, so they can never collide with a row.
+A.extra = {}
+
+function A.saveExtra(key, value)
+	A.extra[key] = value
+	-- rare and decisive: write now rather than wait for the auto-save debounce
+	if A.flushConfig then return A.flushConfig() end
+	return A.saveConfig()
+end
+
 function A.saveConfig()
 	if not has.writefile then return false, "writefile unsupported" end
 	local data = {}
@@ -38,6 +49,8 @@ function A.saveConfig()
 			if ok and v ~= nil then data[e.name] = v end
 		end
 	end
+	data.__extra = {}
+	for k, v in pairs(A.extra) do data.__extra[k] = v end
 	if has.makefolder then
 		pcall(function()
 			if not (isfolder and isfolder(FOLDER)) then makefolder(FOLDER) end
@@ -62,6 +75,9 @@ function A.loadConfig()
 	end)
 	A.configLoading = false
 	sfx.mute = sfx.mute - 1
+	if type(data.__extra) == "table" then
+		for k, v in pairs(data.__extra) do A.extra[k] = v end
+	end
 	return true
 end
 

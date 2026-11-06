@@ -9,6 +9,7 @@ local VOICE = "rbxasset://sounds/electronicpingshort.wav"
 local PITCH = {
 	hover = 1.34, tap = 1.52, on = 1.08, off = 0.76,
 	page = 1.74, open = 0.96, close = 0.66, deny = 0.56,
+	voice = 1.18, -- read-aloud fallback: one soft tone per word
 }
 
 local S = { enabled = true, volume = 0.12, cursor = 1, voices = {}, hoverAt = 0, mute = 0 }
