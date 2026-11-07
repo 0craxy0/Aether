@@ -16,7 +16,12 @@ A.LP = A.Players.LocalPlayer
 A.guiInset = 0
 pcall(function() A.guiInset = game:GetService("GuiService"):GetGuiInset().Y end)
 
-function A.stage(n) print("[Aether] stage " .. n) end
+-- The loader (main.lua) installs the real stage reporter - it also paints the
+-- loading screen, and it knows how many stages there are. This fallback only
+-- matters when env.lua is run on its own, outside the loader.
+if not A.stage then
+	A.stage = function(n) print("[Aether] stage " .. tostring(n)) end
+end
 A.stage("0 start")
 if _G.AetherUnload then pcall(_G.AetherUnload) end -- never stack two instances
 

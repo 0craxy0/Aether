@@ -32,6 +32,28 @@ Dropdowns behave like dropdowns now: opening one closes any other, a click
 outside the row closes it, it closes when you leave the page, and its caret
 turns over while the list is out.
 
+## loading
+
+`main.lua` draws a small centred card before it fetches the first file, then
+repaints it from `A.stage`. It reads `7 / 15 loaded · keybind overlay` with the
+build number underneath, so a slow executor is visibly slow rather than frozen.
+
+- the 15 stages are declared in one `PLAN` table in `main.lua`, in the order they
+  are emitted (which is not the order of `FILES` - `hud` fires before `settings`,
+  `tts` after it). Everything else in the loader calls `A.stage(label)`, so a
+  stage can only be added by adding a row to that table.
+- completion is the file loop ending, not the last stage: `tail/admin.lua`
+  returns before announcing itself on a non-owner client, and the bar must not
+  sit one short forever.
+- every UI call is inside a `pcall`. If the executor will not parent a ScreenGui
+  it logs `loading screen unavailable` and loads normally - the screen is a
+  courtesy, not a dependency.
+- a failed download or syntax error turns the card red with the reason and keeps
+  it up for eight seconds instead of leaving a silent half-loaded hub.
+
+The stage log lines (`[Aether] stage ...`) are unchanged, so console output still
+shows exactly the same sequence.
+
 ## search
 
 The field at the top filters every registered row by name and jumps to the first

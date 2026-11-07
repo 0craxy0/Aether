@@ -48,9 +48,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-07.28"
+local BUILD = "2026-11-07.29"
 -- monotonic: the updater compares rev, never the date string
-local REV = 28
+local REV = 29
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -71,10 +71,196 @@ A.source = BASE .. "main.lua"
 getgenv().AetherSource = A.source
 print("[Aether] build " .. BUILD .. (FRESH and " (fresh fetch)" or ""))
 
+-- ---------------------------------------------------------------- loading ---
+-- The loader is one straight thread. Every game:HttpGet yields, and that yield is
+-- the only chance the engine has to draw a frame between stages - which is why
+-- the screen has to exist before the first fetch and be repainted by each
+-- A.stage call. It is a courtesy, never a dependency: everything below is inside
+-- a pcall, so a client that refuses the ScreenGui still loads the hub normally.
+--
+-- The order here is the order the stages are emitted, not the order of FILES:
+-- a few stages fire from inside a file (hud before settings, tts after settings).
+-- A stage that never fires - "admin panel ready" is owner-only - does not stall
+-- the bar, because completion is declared by the loop ending, not by a stage.
+local PLAN = {
+	{ "0 start", "starting up" },
+	{ "1 helpers + toasts done", "helpers and toasts" },
+	{ "2 window built", "window" },
+	{ "3 modules + config menus defined", "modules and config menus" },
+	{ "4 character/movement/visuals pages done", "character, movement, visuals" },
+	{ "5 combat page done", "combat" },
+	{ "6 keybind overlay done", "keybind overlay" },
+	{ "hud done", "stats HUD" },
+	{ "7 settings page done", "settings" },
+	{ "tts ready", "read-aloud" },
+	{ "announcements ready", "announcements" },
+	{ "8 keybinds done", "keybinds" },
+	{ "9 startup done", "startup" },
+	{ "10 updater armed", "updater" },
+	{ "admin panel ready", "owner panel" },
+}
+local TOTAL = #PLAN
+local STAGE_AT = {}
+for i, s in ipairs(PLAN) do STAGE_AT[s[1]] = i end
+
+local THEME = {
+	bg = Color3.fromHex("1C1C1E"),
+	panel = Color3.fromHex("242426"),
+	stroke = Color3.fromHex("38383A"),
+	text = Color3.fromHex("FFFFFF"),
+	muted = Color3.fromHex("98989D"),
+	accent = Color3.fromHex("0A84FF"),
+	bad = Color3.fromHex("FF453A"),
+}
+
+local loading
+do
+	local ok, api = pcall(function()
+		local Players = game:GetService("Players")
+		local TweenService = game:GetService("TweenService")
+
+		local function font(name, fallback)
+			local okf, f = pcall(function() return Enum.Font[name] end)
+			if okf and f then return f end
+			return fallback
+		end
+
+		local function mk(class, props, parent)
+			local o = Instance.new(class)
+			for k, v in pairs(props) do o[k] = v end
+			o.Parent = parent
+			return o
+		end
+
+		-- gethui is the only parent that reliably survives other scripts clearing
+		-- PlayerGui; without it, use the normal GUI parents in that order.
+		local host
+		if gethui then host = gethui() end
+		if not host and Players.LocalPlayer then host = Players.LocalPlayer:FindFirstChild("PlayerGui") end
+		if not host then host = game:GetService("CoreGui") end
+		if not host then error("no ScreenGui parent available") end
+		local stale = host:FindFirstChild("AetherLoading")
+		if stale then stale:Destroy() end -- a previous run that died before its fade
+
+		local sg = mk("ScreenGui", {
+			Name = "AetherLoading", IgnoreGuiInset = true, ResetOnSpawn = false,
+			DisplayOrder = 999, ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+		}, host)
+
+		local card = mk("CanvasGroup", {
+			Name = "card", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(360, 108), BackgroundColor3 = THEME.bg,
+			BackgroundTransparency = 0.02, BorderSizePixel = 0, GroupTransparency = 0,
+		}, sg)
+		mk("UICorner", { CornerRadius = UDim.new(0, 12) }, card)
+		mk("UIStroke", { Color = THEME.stroke, Thickness = 1, Transparency = 0.25 }, card)
+
+		mk("TextLabel", {
+			BackgroundTransparency = 1, Font = font("BuilderSansBold", Enum.Font.GothamSemibold),
+			Text = "Aether", TextSize = 17, TextColor3 = THEME.text,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Position = UDim2.fromOffset(20, 15), Size = UDim2.new(0, 140, 0, 20),
+		}, card)
+
+		local counter = mk("TextLabel", {
+			BackgroundTransparency = 1, Font = font("BuilderSansMedium", Enum.Font.GothamMedium),
+			Text = "0 / " .. TOTAL .. " loaded", TextSize = 12, TextColor3 = THEME.muted,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -20, 0, 17),
+			Size = UDim2.new(0, 200, 0, 16),
+		}, card)
+
+		local status = mk("TextLabel", {
+			BackgroundTransparency = 1, Font = font("BuilderSans", Enum.Font.Gotham),
+			Text = "starting up", TextSize = 11, TextColor3 = THEME.muted,
+			TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+			Position = UDim2.fromOffset(20, 40), Size = UDim2.new(1, -40, 0, 14),
+		}, card)
+
+		local track = mk("Frame", {
+			BackgroundColor3 = THEME.panel, BorderSizePixel = 0,
+			Position = UDim2.fromOffset(20, 66), Size = UDim2.new(1, -40, 0, 4),
+		}, card)
+		mk("UICorner", { CornerRadius = UDim.new(1, 0) }, track)
+		local fill = mk("Frame", {
+			BackgroundColor3 = THEME.accent, BorderSizePixel = 0,
+			Size = UDim2.fromScale(0.02, 1),
+		}, track)
+		mk("UICorner", { CornerRadius = UDim.new(1, 0) }, fill)
+
+		mk("TextLabel", {
+			BackgroundTransparency = 1, Font = font("BuilderSans", Enum.Font.Gotham),
+			Text = "Build " .. BUILD, TextSize = 10, TextColor3 = THEME.muted,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Position = UDim2.fromOffset(20, 80), Size = UDim2.new(1, -40, 0, 12),
+		}, card)
+
+		local api = { dead = false }
+
+		function api.set(i, text)
+			if api.dead then return end
+			i = math.clamp(i, 0, TOTAL)
+			counter.Text = string.format("%d / %d loaded", i, TOTAL)
+			if text then status.Text = text end
+			TweenService:Create(fill,
+				TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+				{ Size = UDim2.fromScale(math.max(i / TOTAL, 0.02), 1) }):Play()
+		end
+
+		-- "ready" is shown for a beat before the card goes, so the last frame the
+		-- user sees is a finished bar rather than the window popping into place.
+		function api.done()
+			if api.dead then return end
+			api.set(TOTAL, "ready")
+			task.delay(0.5, function()
+				if api.dead then return end
+				api.dead = true
+				pcall(function()
+					local tw = TweenService:Create(card, TweenInfo.new(0.3), { GroupTransparency = 1 })
+					tw:Play()
+					tw.Completed:Wait()
+				end)
+				if sg.Parent then sg:Destroy() end
+			end)
+		end
+
+		function api.fail(msg)
+			if api.dead then return end
+			api.dead = true
+			counter.Text = "stopped"
+			status.Text = tostring(msg):sub(1, 90)
+			status.TextColor3 = THEME.bad
+			task.delay(8, function() if sg.Parent then sg:Destroy() end end)
+		end
+
+		return api
+	end)
+	loading = ok and api or nil
+	if not ok then warn("[Aether] loading screen unavailable: " .. tostring(api)) end
+end
+A.loading = loading
+
+-- The stage reporter. main.lua owns it because the loader is the only place that
+-- knows how many stages there are; core/env.lua only installs a console-only
+-- fallback for the case where it is run on its own.
+local stageCount = 0
+function A.stage(label)
+	label = tostring(label)
+	print("[Aether] stage " .. label)
+	local at = STAGE_AT[label]
+	if at then
+		stageCount = math.max(stageCount, at)
+	else
+		stageCount = math.min(stageCount + 1, TOTAL)
+	end
+	if loading then pcall(loading.set, stageCount, at and PLAN[at][2] or label) end
+end
+
 -- a half-loaded hub is worse than none: warn once, then tear down whatever was built
 -- so the ScreenGui from core/notify.lua cannot outlive the load that made it
 local function fail(msg)
 	warn("[Aether] " .. msg)
+	if loading then pcall(loading.fail, msg) end
 	if type(A.unload) == "function" then pcall(A.unload) end
 end
 
@@ -101,3 +287,8 @@ for _, path in ipairs(FILES) do
 		return fail("error in " .. path .. ": " .. tostring(runErr))
 	end
 end
+
+-- The loop ending is the completion signal. Waiting for the last stage would
+-- leave the bar one short forever on a non-owner client, where tail/admin.lua
+-- returns before it can announce itself.
+if loading then pcall(loading.done) end

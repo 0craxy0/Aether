@@ -1,6 +1,6 @@
 {
-  "rev": 28,
-  "build": "2026-11-07.28",
-  "notes": "Colour picker now maps the pointer correctly under the topbar inset; aim and kill aura no longer throw a Raycast error on the frame you respawn; fullbright restores the map's own lighting even if it was enabled twice; the keybind overlay cannot duplicate a row; dropdowns close on outside click and on a page switch; search has / and Ctrl+F, Escape, and a match counter; Settings gains Copy config and Reset all settings; toasts hold while hovered.",
+  "rev": 29,
+  "build": "2026-11-07.29",
+  "notes": "New loading screen: a 15-stage progress card that names what is being built (helpers, window, modules, pages, HUD, settings, read-aloud, announcements, keybinds, startup, updater) and shows the build number, then fades into the window. It is built before the first fetch, can never block the load, and reports a failed stage instead of vanishing.",
   "loader": "main.lua"
 }
