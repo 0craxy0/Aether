@@ -85,8 +85,13 @@ end
 
 function ESP.stop()
 	if ESP.conn then ESP.conn:Disconnect(); ESP.conn = nil end
-	for plr in pairs(ESP.objects) do dropESP(plr) end
-	for plr in pairs(ESP.chams) do killCham(plr) end
+	-- Snapshot the keys first: dropESP clears the entry it is handed, and
+	-- removing the current key while iterating a table with next is undefined.
+	local players, chams = {}, {}
+	for plr in pairs(ESP.objects) do players[#players + 1] = plr end
+	for plr in pairs(ESP.chams) do chams[#chams + 1] = plr end
+	for _, plr in ipairs(players) do dropESP(plr) end
+	for _, plr in ipairs(chams) do killCham(plr) end
 	ESP.active = false
 end
 

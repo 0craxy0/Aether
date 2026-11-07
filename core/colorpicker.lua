@@ -40,27 +40,24 @@ local function parseHex(text)
 end
 
 -- Pointer maths. Horizontal mapping is unambiguous; vertical is not, because
--- GetMouseLocation is measured from below the topbar while a GuiObject's
--- AbsolutePosition is measured from wherever its ScreenGui's origin sits. If the
--- screen ignores the inset, the two differ by exactly the inset.
+-- UserInputService:GetMouseLocation is measured from the top of the window while
+-- a GuiObject's AbsolutePosition is reported from the topbar origin.
 --
--- That is decidable at runtime instead of guessed: a screen that ignores the
--- inset spans the full viewport; one that does not is shorter by the inset.
--- When neither number is available the offset is learned from the first click,
--- which is guaranteed to be inside the rect that captured it.
+-- The engine keeps that distinction even for a ScreenGui with IgnoreGuiInset:
+-- an object drawn at the very top of the screen still reads AbsolutePosition.Y
+-- = -36 (this is deliberate, so old UIs that hard-coded the inset keep working).
+-- So the conversion is always "physical = AbsolutePosition + inset", and the
+-- pointer has to have the inset subtracted from it - never added. Getting the
+-- sign wrong moves the picker by twice the inset.
+--
+-- GuiService can fail in a stripped-down executor; when it does the offset is
+-- learned from the first click, which is guaranteed to be inside the rect that
+-- captured it.
 local function pointerOffset()
-	local inset = 0
-	pcall(function() inset = game:GetService("GuiService"):GetGuiInset().Y end)
+	local ok, inset = pcall(function() return game:GetService("GuiService"):GetGuiInset().Y end)
+	if not ok or type(inset) ~= "number" then return nil end
 	if inset <= 0 then return 0 end
-
-	local screenH, viewH = 0, 0
-	pcall(function()
-		screenH = A.screen and A.screen.AbsoluteSize.Y or 0
-		viewH = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize.Y or 0
-	end)
-	if screenH <= 0 or viewH <= 0 then return nil end -- unknown: learn from a click
-
-	return (screenH + inset * 0.5 >= viewH) and inset or 0
+	return -inset
 end
 
 local HUE_CYCLE = ColorSequence.new({
@@ -211,7 +208,12 @@ function A.colorPicker(parent, name, defaultColor, onChanged, legacyNames)
 			local _, _, abs, size = raw(p)
 			local inset = 0
 			pcall(function() inset = game:GetService("GuiService"):GetGuiInset().Y end)
-			for _, off in ipairs({ 0, inset, -inset }) do
+			-- try the sign the runtime suggested first, then the two other
+			-- candidates: a click near an edge is what makes this decidable
+			local candidates = {}
+			if yOff then candidates[#candidates + 1] = yOff end
+			for _, off in ipairs({ 0, inset, -inset }) do candidates[#candidates + 1] = off end
+			for _, off in ipairs(candidates) do
 				local y = (p.Y + off - abs.Y) / math.max(size.Y, 1)
 				if y >= 0 and y <= 1 then
 					yOff = off
@@ -306,6 +308,11 @@ function A.colorPicker(parent, name, defaultColor, onChanged, legacyNames)
 	end, function()
 		return hexOf(current)
 	end)
+
+	-- "Reset all settings" has to put the accent back too, and that only works if
+	-- it goes through onChanged (A.setAccent), not just through the local state.
+	local entry = A.registry[#A.registry]
+	entry.reset = function() setColor(defaultColor) end
 
 	return { row = row, get = function() return current end, set = setColor }
 end

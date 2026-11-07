@@ -79,7 +79,8 @@ local searchBox = new("TextBox", {
 	Text = "", PlaceholderText = "Search", PlaceholderColor3 = T.muted,
 	BackgroundTransparency = 1, Font = FONT.reg, TextSize = 12, TextColor3 = T.text,
 	TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false,
-	Position = UDim2.fromOffset(11, 0), Size = UDim2.new(1, -22, 1, 0), Parent = search,
+	-- right side is left clear for the match counter tail/startup.lua adds
+	Position = UDim2.fromOffset(11, 0), Size = UDim2.new(1, -84, 1, 0), Parent = search,
 })
 
 local body = new("Frame", {

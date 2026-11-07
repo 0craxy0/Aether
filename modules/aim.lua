@@ -24,6 +24,23 @@ A.AIM_PARTS = AIM_PARTS
 local aimParams = RaycastParams.new()
 aimParams.FilterType = Enum.RaycastFilterType.Exclude
 
+-- A nil in FilterDescendantsInstances is not "ignore nothing", it is an argument
+-- error on the next Raycast - and LocalPlayer.Character is nil for the frame or
+-- two after a respawn. Build the list without holes.
+local function aimIgnore(...)
+	local list = {}
+	for i = 1, select("#", ...) do
+		local v = select(i, ...)
+		if v then list[#list + 1] = v end
+	end
+	return list
+end
+
+local function aimBlocked(caster, target)
+	aimParams.FilterDescendantsInstances = aimIgnore(caster, target)
+	return aimParams
+end
+
 -- bound by name so the step can be unbound on stop; see Aim.start
 local RENDER_NAME = "AetherAim"
 
@@ -81,8 +98,7 @@ local function aimEvaluate(plr, cam, mouse, ignoreFov)
 	local d2 = (screenPos - mouse).Magnitude
 	if not ignoreFov and d2 > s.fov and not TF.black[plr.UserId] then return nil end
 	if s.wallCheck then
-		aimParams.FilterDescendantsInstances = { LP.Character, c }
-		if workspace:Raycast(cam.CFrame.Position, part.Position - cam.CFrame.Position, aimParams) then return nil end
+		if workspace:Raycast(cam.CFrame.Position, part.Position - cam.CFrame.Position, aimBlocked(LP.Character, c)) then return nil end
 	end
 	local metric = d2
 	if s.priority == "Distance" then metric = dist
@@ -183,8 +199,7 @@ function Aim.start()
 				end
 			elseif (tick() - Aim.lastShot) * 1000 >= s.triggerDelay then
 				local ray = cam:ViewportPointToRay(m.X, m.Y)
-				aimParams.FilterDescendantsInstances = { LP.Character }
-				local res = workspace:Raycast(ray.Origin, ray.Direction * s.maxDist, aimParams)
+				local res = workspace:Raycast(ray.Origin, ray.Direction * s.maxDist, aimBlocked(LP.Character))
 				if res then
 					local model = res.Instance:FindFirstAncestorOfClass("Model")
 					local plr = model and Players:GetPlayerFromCharacter(model)

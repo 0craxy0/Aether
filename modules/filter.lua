@@ -18,6 +18,10 @@ end
 
 -- UI mask: Drawing visuals never overlay the UI -----------------
 local maskGuis = A.maskGuis
+-- Drawing and the pointer work in window space; AbsolutePosition starts at the
+-- topbar origin. The rectangles below are compared against both, so they are
+-- kept in window space.
+local INSET = A.guiInset or 0
 
 local function uiRects()
 	local out = {}
@@ -25,7 +29,7 @@ local function uiRects()
 		if g.Parent and g.Visible and g.AbsoluteSize.X > 0 and g.AbsoluteSize.Y > 0
 			and not (g:IsA("CanvasGroup") and g.GroupTransparency >= 0.99) then
 			local p, s = g.AbsolutePosition, g.AbsoluteSize
-			out[#out + 1] = { p.X, p.Y, p.X + s.X, p.Y + s.Y }
+			out[#out + 1] = { p.X, p.Y + INSET, p.X + s.X, p.Y + INSET + s.Y }
 		end
 	end
 	return out

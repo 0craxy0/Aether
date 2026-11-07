@@ -20,6 +20,9 @@ local function tabIndex(name)
 end
 
 local function selectPage(name)
+	-- an expanded dropdown belongs to the page it was opened on; leaving it open
+	-- would also leave the page's canvas taller than the rows it now shows
+	if A.closeDropdowns then A.closeDropdowns() end
 	-- recolouring the accent re-selects the current tab: that is a repaint, not a trip
 	local same = A.activeTab == name
 	local dir = tabIndex(name) >= tabIndex(A.activeTab or "") and 1 or -1

@@ -60,8 +60,9 @@ local function drift(dt)
 	if D.enabled and shown then
 		local ws = window.AbsoluteSize
 		local m = UserInputService:GetMouseLocation()
+		local my = m.Y - (A.guiInset or 0) -- pointer and AbsolutePosition share a space only after this
 		local nx = ((m.X - (wp.X + ws.X / 2)) / math.max(ws.X, 1)) * 2
-		local ny = ((m.Y - (wp.Y + ws.Y / 2)) / math.max(ws.Y, 1)) * 2
+		local ny = ((my - (wp.Y + ws.Y / 2)) / math.max(ws.Y, 1)) * 2
 		tx = -math.clamp(nx, -1.4, 1.4) * D.amount
 		ty = -math.clamp(ny, -1.4, 1.4) * D.amount
 	end

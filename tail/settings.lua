@@ -41,8 +41,9 @@ function A.saveExtra(key, value)
 	return A.saveConfig()
 end
 
-function A.saveConfig()
-	if not has.writefile then return false, "writefile unsupported" end
+-- The config table, independent of the disk. Exported on its own so "Copy
+-- config" can put the exact JSON on the clipboard without writing a file first.
+function A.buildConfig()
 	local data = {}
 	for _, e in ipairs(A.registry) do
 		if e.save then
@@ -52,6 +53,12 @@ function A.saveConfig()
 	end
 	data.__extra = {}
 	for k, v in pairs(A.extra) do data.__extra[k] = v end
+	return data
+end
+
+function A.saveConfig()
+	if not has.writefile then return false, "writefile unsupported" end
+	local data = A.buildConfig()
 	if has.makefolder then
 		pcall(function()
 			if not (isfolder and isfolder(FOLDER)) then makefolder(FOLDER) end
@@ -104,6 +111,23 @@ function A.flushConfig()
 	return A.saveConfig()
 end
 
+-- Put every widget back on the value it was created with, then write once.
+-- Sound is muted and auto-save is held off for the duration: a reset fires
+-- dozens of callbacks and one disk write, not dozens of both.
+function A.resetConfig()
+	sfx.mute = sfx.mute + 1
+	A.configLoading = true
+	for _, e in ipairs(A.registry) do
+		if e.reset then pcall(e.reset) end
+	end
+	A.configLoading = false
+	sfx.mute = sfx.mute - 1
+	local ok, err = A.flushConfig()
+	-- the in-memory reset already happened; persisting it is the bonus, and an
+	-- executor without writefile is not a failed reset
+	return ok or err == "writefile unsupported", err
+end
+
 -- a change made in the last 1.5s is not on disk yet; write it before the panel
 -- goes away, or the auto-save the user trusted loses the last thing they set
 onCleanup(function() if saveTimer then A.flushConfig() end end)
@@ -126,6 +150,18 @@ end)
 button(sCfg, "Load config", "LOAD", function()
 	local ok, err = A.loadConfig()
 	if ok then notify("Config", "loaded", "good") else notify("Config", tostring(err), "bad") end
+end)
+button(sCfg, "Copy config", "COPY", function()
+	local ok, encoded = pcall(function() return HttpService:JSONEncode(A.buildConfig()) end)
+	if ok and type(encoded) == "string" then
+		A.copy(encoded)
+	else
+		notify("Config", tostring(encoded), "bad")
+	end
+end)
+button(sCfg, "Reset all settings", "RESET", function()
+	local ok, err = A.resetConfig()
+	notify("Config", ok and "every setting is back to its default" or tostring(err), ok and "good" or "bad")
 end)
 
 local sSess = pSet.section("Session", 3)

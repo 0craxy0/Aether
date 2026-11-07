@@ -21,6 +21,17 @@ A.KA = KA
 local kaParams = RaycastParams.new()
 kaParams.FilterType = Enum.RaycastFilterType.Exclude
 
+-- Same rule as the aim modules: never put nil in the filter list, or the first
+-- Raycast after a respawn throws instead of returning "no wall".
+local function kaIgnore(...)
+	local list = {}
+	for i = 1, select("#", ...) do
+		local v = select(i, ...)
+		if v then list[#list + 1] = v end
+	end
+	return list
+end
+
 local function kaKeyHeld()
 	local k = KA.s.key
 	if k == "Always" then return true end
@@ -90,7 +101,7 @@ local function kaCandidates(myRoot)
 				if ok and s.skipSitting and hum.Sit then ok = false end
 				if ok and s.friendCheck and SA.friends[plr] then ok = false end
 				if ok and s.wallCheck then
-					kaParams.FilterDescendantsInstances = { LP.Character, c }
+					kaParams.FilterDescendantsInstances = kaIgnore(LP.Character, c)
 					if workspace:Raycast(myRoot.Position, root.Position - myRoot.Position, kaParams) then ok = false end
 				end
 				if ok then

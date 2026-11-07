@@ -19,10 +19,42 @@ The panel is built to behave like an object, not a picture:
   trail behind the shell when you throw the window
 - **motion** - pages travel in from the side you came from and their rows settle
   one after another; controls lean toward the cursor
-- **material** - a press leaves a ripple in the row it landed on
+- **material** - a press leaves a ripple in the row it landed on, and the row
+  under the cursor grows a 2px accent rail on its leading edge
 - **voice** - one short blip for the whole interface, pitched per intent
 
 All four are switchable on the UI page, and none of them touch a module's state.
+
+Toasts are readable on your own schedule: hovering one holds it open, moving
+away lets it expire, and a click dismisses it immediately.
+
+Dropdowns behave like dropdowns now: opening one closes any other, a click
+outside the row closes it, it closes when you leave the page, and its caret
+turns over while the list is out.
+
+## search
+
+The field at the top filters every registered row by name and jumps to the first
+page that has a match. A small counter on the right says how many rows matched,
+so an empty page never looks like a broken search.
+
+- `/` or `Ctrl+F` focuses the field (and shows the panel if it was hidden)
+- `Escape` clears it and hands focus back
+- both shortcuts stay out of the way while any other text box is focused
+
+## config
+
+`Aether/config.json` is written 1.5s after the last change (Settings > Auto-save
+on change). The Config section also gives you:
+
+- **Save config** - flush the pending write right now
+- **Load config** - replay the file through every widget, without starting a
+  save in the middle of the read
+- **Copy config** - the exact JSON the file would contain, on the clipboard
+- **Reset all settings** - every row back to the value it was created with, then
+  one write; the accent returns to its default through `A.setAccent`, so the
+  whole panel repaints rather than only the swatch
+
 
 ## read aloud
 

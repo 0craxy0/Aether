@@ -1,6 +1,6 @@
 {
-  "rev": 27,
-  "build": "2026-11-06.27",
-  "notes": "Silent aim fixes: rays now reach targets farther than the original ray, the wall check stops erroring when your character is respawning, Mixed no longer drops shots when the head is missing, Random re-rolls per shot, and Mouse.Hit keeps its direction.",
+  "rev": 28,
+  "build": "2026-11-07.28",
+  "notes": "Colour picker now maps the pointer correctly under the topbar inset; aim and kill aura no longer throw a Raycast error on the frame you respawn; fullbright restores the map's own lighting even if it was enabled twice; the keybind overlay cannot duplicate a row; dropdowns close on outside click and on a page switch; search has / and Ctrl+F, Escape, and a match counter; Settings gains Copy config and Reset all settings; toasts hold while hovered.",
   "loader": "main.lua"
 }

@@ -145,12 +145,14 @@ local function refreshCache()
 end
 
 local function under(m)
+	-- the pointer is in window space; the labels are in AbsolutePosition space
+	local y = m.Y - (A.guiInset or 0)
 	-- backwards: the later a label was created, the more likely it is on top
 	for i = #cache, 1, -1 do
 		local d = cache[i]
 		if d.Parent then
 			local p, s = d.AbsolutePosition, d.AbsoluteSize
-			if m.X >= p.X and m.X <= p.X + s.X and m.Y >= p.Y and m.Y <= p.Y + s.Y then
+			if m.X >= p.X and m.X <= p.X + s.X and y >= p.Y and y <= p.Y + s.Y then
 				return d
 			end
 		end

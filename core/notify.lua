@@ -70,14 +70,37 @@ function A.notify(title, body, kind)
 	local pop = new("UIScale", { Scale = 0.3, Parent = card })
 	tween(pop, 0.8, { Scale = 1 }, Enum.EasingStyle.Elastic)
 
-	task.delay(3.6, function()
-		if card and card.Parent then
-			tween(pop, 0.3, { Scale = 0.6 })
-			tween(card, 0.3, { GroupTransparency = 1 })
-			task.wait(0.22)
-			retire(card)
+	-- A toast that vanishes while it is being read is the most annoying thing a
+	-- notification can do, so hovering holds it and moving off releases it. A
+	-- click dismisses immediately - the card already looks like a button.
+	local held, waiting, closing = false, false, false
+	local function dismiss()
+		if closing or not card.Parent then return end
+		closing = true
+		tween(pop, 0.3, { Scale = 0.6 })
+		tween(card, 0.3, { GroupTransparency = 1 })
+		task.delay(0.22, function() retire(card) end)
+	end
+	local function arm(after)
+		task.delay(after, function()
+			if closing or not card.Parent then return end
+			if held then waiting = true; return end -- released by MouseLeave
+			dismiss()
+		end)
+	end
+	card.MouseEnter:Connect(function() held = true end)
+	card.MouseLeave:Connect(function()
+		held = false
+		if waiting then waiting = false; dismiss() end
+	end)
+	-- CanvasGroup is a GuiObject, not a GuiButton - there is no MouseButton1Click
+	-- on it, so the click has to come through InputBegan.
+	card.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dismiss()
 		end
 	end)
+	arm(3.6)
 end
 
 A.stage("1 helpers + toasts done")

@@ -126,11 +126,16 @@ onCleanup(function() if afkConn then afkConn:Disconnect() end end)
 local savedLight = {}
 function A.setFullbright(on)
 	if on then
-		savedLight = {
-			Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime,
-			Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient,
-			FogEnd = Lighting.FogEnd, GlobalShadows = Lighting.GlobalShadows,
-		}
+		-- Only snapshot the first time. Re-enabling used to overwrite the saved
+		-- values with the already-bright ones, so unloading could never put the
+		-- map's own lighting back.
+		if next(savedLight) == nil then
+			savedLight = {
+				Brightness = Lighting.Brightness, ClockTime = Lighting.ClockTime,
+				Ambient = Lighting.Ambient, OutdoorAmbient = Lighting.OutdoorAmbient,
+				FogEnd = Lighting.FogEnd, GlobalShadows = Lighting.GlobalShadows,
+			}
+		end
 		Lighting.Brightness = 2.5
 		Lighting.ClockTime = 14
 		Lighting.Ambient = Color3.fromRGB(200, 200, 200)
@@ -139,6 +144,7 @@ function A.setFullbright(on)
 		Lighting.GlobalShadows = false
 	else
 		for k, v in pairs(savedLight) do Lighting[k] = v end
+		savedLight = {}
 	end
 end
 onCleanup(function() A.setFullbright(false) end)

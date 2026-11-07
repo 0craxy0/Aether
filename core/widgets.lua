@@ -3,6 +3,14 @@ local new, tween, corner, label = A.new, A.tween, A.corner, A.label
 local T, FONT, notify = A.T, A.FONT, A.notify
 local UserInputService = A.UserInputService
 local motion, sfx = A.motion, A.sfx
+local INSET = A.guiInset or 0
+
+-- pointer in a row's own coordinates: the mouse is in window space, the row is
+-- in AbsolutePosition space, and the two differ by the topbar inset
+local function localPointer(obj)
+	local m = UserInputService:GetMouseLocation()
+	return m.X - obj.AbsolutePosition.X, m.Y - INSET - obj.AbsolutePosition.Y
+end
 
 local registry = {}      -- search + config index
 local accentLinks = {}   -- objects that repaint on accent change
@@ -40,11 +48,23 @@ A.rowAlpha = { idle = 0.35, hover = 0.2 }
 local function rowBase(parent, height)
 	local r = rowBaseRaw(parent, height)
 	r.ClipsDescendants = true -- keeps a click ripple inside the row it belongs to
+	-- a 2px intent bar that lights up under the cursor: the row already changed
+	-- brightness, but at 0.35 alpha on a dark panel that read as almost nothing
+	local bar = new("Frame", {
+		Name = "rowAccent", Size = UDim2.fromOffset(2, 14), AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 0, 0.5, 0), BackgroundColor3 = T.accent,
+		BackgroundTransparency = 1, BorderSizePixel = 0, Parent = r,
+	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	accentLinks[#accentLinks + 1] = { obj = bar, kind = "fill" }
 	r.MouseEnter:Connect(function()
 		tween(r, 0.15, { BackgroundTransparency = A.rowAlpha.hover })
+		tween(bar, 0.15, { BackgroundTransparency = 0 })
 		sfx("hover")
 	end)
-	r.MouseLeave:Connect(function() tween(r, 0.15, { BackgroundTransparency = A.rowAlpha.idle }) end)
+	r.MouseLeave:Connect(function()
+		tween(r, 0.15, { BackgroundTransparency = A.rowAlpha.idle })
+		tween(bar, 0.15, { BackgroundTransparency = 1 })
+	end)
 	return r
 end
 
@@ -96,8 +116,8 @@ function A.toggle(parent, name, default, onChanged)
 	end
 
 	hit.MouseButton1Click:Connect(function()
-		local m = UserInputService:GetMouseLocation()
-		motion.ripple(r, m.X - r.AbsolutePosition.X, m.Y - r.AbsolutePosition.Y)
+		local mx, my = localPointer(r)
+		motion.ripple(r, mx, my)
 		set(not state)
 		knob.Size = UDim2.fromOffset(30, 16)
 		tween(knob, 0.6, { Size = UDim2.fromOffset(20, 20) }, Enum.EasingStyle.Elastic)
@@ -105,6 +125,7 @@ function A.toggle(parent, name, default, onChanged)
 	register(r, name, function(v) set(v, true) end)
 	registry[#registry].load = function(v) set(v and true or false) end
 	registry[#registry].save = function() return state end
+	registry[#registry].reset = function() set(default and true or false) end
 	if default then
 		set(true, true)
 		if onChanged then pcall(onChanged, true) end
@@ -141,6 +162,9 @@ function A.slider(parent, name, min, max, default, onChanged)
 	local lastX = nil
 	local fineOff = 0
 	local commitToken = 0
+	-- a malformed config could hand us min == max; dividing by that span would
+	-- produce inf / nan and freeze the fill bar at an unreadable position
+	local span = math.max(max - min, 1e-6)
 	local function commitNow()
 		commitToken += 1
 		if onChanged then pcall(onChanged, value) end
@@ -175,9 +199,10 @@ function A.slider(parent, name, min, max, default, onChanged)
 	end)
 
 	local function set(v, silent)
+		v = tonumber(v) or default
 		if freeNext then acc = v else acc = math.clamp(v, min, max) end
 		value = math.floor(acc + 0.5)
-		local a = math.clamp((value - min) / (max - min), 0, 1)
+		local a = math.clamp((value - min) / span, 0, 1)
 		tween(fill, 0.08, { Size = UDim2.fromScale(a, 1) })
 		tween(knob, 0.08, { Position = UDim2.fromScale(a, 0.5) })
 		val.Text = tostring(value)
@@ -189,10 +214,10 @@ function A.slider(parent, name, min, max, default, onChanged)
 		local rel = (x - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1)
 		local fine = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
 		if lastX and fine then
-			fineOff = fineOff - (x - lastX) / math.max(track.AbsoluteSize.X, 1) * (max - min) * 0.9
+			fineOff = fineOff - (x - lastX) / math.max(track.AbsoluteSize.X, 1) * span * 0.9
 		end
 		lastX = x
-		set(min + rel * (max - min) + fineOff)
+		set(min + rel * span + fineOff)
 	end
 
 	valBox.FocusLost:Connect(function()
@@ -260,6 +285,9 @@ function A.slider(parent, name, min, max, default, onChanged)
 	end
 	r.Destroying:Connect(function() moveConn:Disconnect(); endConn:Disconnect() end)
 	registry[#registry].save = function() return value end
+	-- Reset all settings replays this: snap back, then commit once, so the module
+	-- sees the default immediately instead of 0.2s later through the debounce.
+	registry[#registry].reset = function() freeNext = false; set(default, true); commitNow() end
 	set(default, true)
 	return { set = set, get = function() return value end, row = r }
 end
@@ -279,8 +307,8 @@ function A.button(parent, name, text, callback)
 	b.MouseLeave:Connect(function() tween(b, 0.12, { BackgroundColor3 = T.stroke }) end)
 	r.MouseEnter:Connect(function() motion.magnet(b, 24, 2.5) end)
 	b.MouseButton1Click:Connect(function()
-		local m = UserInputService:GetMouseLocation()
-		motion.ripple(r, m.X - r.AbsolutePosition.X, m.Y - r.AbsolutePosition.Y)
+		local mx, my = localPointer(r)
+		motion.ripple(r, mx, my)
 		sfx("tap")
 		b.Size = UDim2.fromOffset(58, 16)
 		tween(b, 0.6, { Size = UDim2.fromOffset(74, 22) }, Enum.EasingStyle.Elastic)
@@ -291,6 +319,30 @@ function A.button(parent, name, text, callback)
 end
 
 -- dropdown ----------------------------------------------------
+-- One list is open at a time. A click anywhere outside the row closes it, and so
+-- does a page switch (core/pagekit.lua calls A.closeDropdowns) - an expanded row
+-- left behind on a page nobody is looking at is otherwise invisible until the
+-- page comes back with a dropdown the user never opened.
+local openDropdowns = {}
+
+local function closeDropdowns()
+	for d in pairs(openDropdowns) do d.close() end
+end
+A.closeDropdowns = closeDropdowns
+
+UserInputService.InputBegan:Connect(function(i)
+	if i.UserInputType ~= Enum.UserInputType.MouseButton1 and i.UserInputType ~= Enum.UserInputType.Touch then return end
+	for d in pairs(openDropdowns) do
+		if d.isOpen() then
+			local p, s = d.row.AbsolutePosition, d.row.AbsoluteSize
+			-- the input is in window space, the row in AbsolutePosition space
+			local m = Vector2.new(i.Position.X, i.Position.Y - INSET)
+			local inside = m.X >= p.X and m.X <= p.X + s.X and m.Y >= p.Y and m.Y <= p.Y + s.Y
+			if not inside then d.close() end
+		end
+	end
+end)
+
 function A.dropdown(parent, name, options, default, onChanged)
 	local r = new("Frame", { Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = T.raised, BackgroundTransparency = 0.35, BorderSizePixel = 0, ClipsDescendants = true, Parent = parent })
 	corner(r, 7)
@@ -299,9 +351,29 @@ function A.dropdown(parent, name, options, default, onChanged)
 	local sel = new("TextButton", {
 		Text = default, Font = FONT.med, TextSize = 11, TextColor3 = T.text,
 		BackgroundColor3 = T.stroke, AutoButtonColor = false, BorderSizePixel = 0,
+		TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
 		AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -9, 0, 6),
 		Size = UDim2.fromOffset(96, 22), Parent = r,
-	}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0, 5) }),
+		-- room for the caret, so a long option never runs underneath it
+		new("UIPadding", { PaddingLeft = UDim.new(0, 9), PaddingRight = UDim.new(0, 20) }),
+	})
+
+	-- caret: two arms of a "v", held in a frame so opening rotates both at once
+	local caret = new("Frame", {
+		Name = "caret", AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -6, 0.5, 0),
+		Size = UDim2.fromOffset(12, 12), BackgroundTransparency = 1, Parent = sel,
+	})
+	for i = 1, 2 do
+		new("Frame", {
+			Name = "arm", AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(i == 1 and 3 or 7, 5),
+			Size = UDim2.fromOffset(5, 1.5), Rotation = i == 1 and 45 or -45,
+			BackgroundColor3 = T.muted, BorderSizePixel = 0, Parent = caret,
+		})
+	end
+
 	r.MouseEnter:Connect(function() motion.magnet(sel, 24, 2) end)
 
 	local list = new("Frame", { Position = UDim2.fromOffset(9, 34), Size = UDim2.new(1, -18, 0, 0), BackgroundTransparency = 1, Parent = r }, {
@@ -309,38 +381,52 @@ function A.dropdown(parent, name, options, default, onChanged)
 	})
 
 	local open = false
+	local function setOpen(v)
+		open = v
+		r.Size = UDim2.new(1, 0, 0, v and (40 + #options * 25) or 34)
+		list.Size = UDim2.new(1, -18, 0, v and (#options * 25) or 0)
+		tween(caret, 0.18, { Rotation = v and 180 or 0 }, Enum.EasingStyle.Quint)
+	end
+
+	local function choose(opt, silent)
+		sel.Text = opt
+		if open then setOpen(false) end
+		if onChanged then pcall(onChanged, opt) end
+		if not silent and A.touch then A.touch() end
+	end
+
 	for i, opt in ipairs(options) do
 		local e = new("TextButton", {
 			Text = opt, Font = FONT.reg, TextSize = 11, TextColor3 = T.muted,
 			BackgroundColor3 = T.panel, AutoButtonColor = false, BorderSizePixel = 0,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 			Size = UDim2.new(1, 0, 0, 22), LayoutOrder = i, Parent = list,
 		}, { new("UICorner", { CornerRadius = UDim.new(0, 4) }) })
+		e.MouseEnter:Connect(function() tween(e, 0.1, { TextColor3 = T.text, BackgroundColor3 = T.raised }) end)
+		e.MouseLeave:Connect(function() tween(e, 0.1, { TextColor3 = T.muted, BackgroundColor3 = T.panel }) end)
 		e.MouseButton1Click:Connect(function()
 			sfx("tap", 0.8)
-			sel.Text = opt
-			open = false
-			r.Size = UDim2.new(1, 0, 0, 34)
-			list.Size = UDim2.new(1, -18, 0, 0)
-			if onChanged then pcall(onChanged, opt) end
-			if A.touch then A.touch() end
+			choose(opt)
 		end)
 	end
 
 	sel.MouseButton1Click:Connect(function()
-		open = not open
-		if open then
-			r.Size = UDim2.new(1, 0, 0, 40 + #options * 25)
-			list.Size = UDim2.new(1, -18, 0, #options * 25)
-		else
-			r.Size = UDim2.new(1, 0, 0, 34)
-			list.Size = UDim2.new(1, -18, 0, 0)
-		end
+		local want = not open
+		if want then closeDropdowns() end
+		setOpen(want)
+		if want then sfx("tap", 0.6) end
 	end)
 
-	register(r, name, function(v)
-		sel.Text = v
-		if onChanged then pcall(onChanged, v) end
-	end, function() return sel.Text end)
+	local state = {
+		row = r,
+		close = function() if open then setOpen(false) end end,
+		isOpen = function() return open end,
+	}
+	openDropdowns[state] = true
+	r.Destroying:Connect(function() openDropdowns[state] = nil end)
+
+	register(r, name, function(v) choose(v, true) end, function() return sel.Text end)
+	registry[#registry].reset = function() choose(default) end
 	return { get = function() return sel.Text end, row = r }
 end
 
@@ -435,5 +521,6 @@ function A.keybind(parent, name, default)
 
 	apply(default)
 	register(r, name, function(v) apply(v) end, function() return key end)
+	registry[#registry].reset = function() apply(default) end
 	return { get = function() return key end, row = r, conn = conn }
 end

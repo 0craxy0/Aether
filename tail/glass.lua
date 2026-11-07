@@ -126,7 +126,7 @@ local lgConn = RunService.Heartbeat:Connect(function()
 	local ap, as = window.AbsolutePosition, window.AbsoluteSize
 	local sc = math.max(uiScales[1].Scale, 0.01)
 	local tx = math.clamp((m.X - ap.X) / sc, 0, as.X / sc)
-	local ty = math.clamp((m.Y - ap.Y) / sc, 0, as.Y / sc)
+	local ty = math.clamp((m.Y - (A.guiInset or 0) - ap.Y) / sc, 0, as.Y / sc)
 	if LG.snap then
 		LG.mx, LG.my = tx, ty
 		LG.snap = false

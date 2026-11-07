@@ -9,6 +9,13 @@ end
 
 A.LP = A.Players.LocalPlayer
 
+-- Coordinate spaces, once. GetMouseLocation is measured from the top of the
+-- window; GuiObject.AbsolutePosition is reported from the topbar origin even
+-- when the ScreenGui ignores the inset. Anything that compares a pointer with an
+-- AbsolutePosition has to subtract this, or it is wrong by a whole topbar.
+A.guiInset = 0
+pcall(function() A.guiInset = game:GetService("GuiService"):GetGuiInset().Y end)
+
 function A.stage(n) print("[Aether] stage " .. n) end
 A.stage("0 start")
 if _G.AetherUnload then pcall(_G.AetherUnload) end -- never stack two instances

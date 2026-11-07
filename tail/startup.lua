@@ -1,5 +1,6 @@
 local A = ...
-local tween, notify, sfx = A.tween, A.notify, A.sfx
+local tween, notify, sfx, label = A.tween, A.notify, A.sfx, A.label
+local T = A.T
 local window, shadow, UI = A.window, A.shadow, A.UI
 local closeBtn, searchBox = A.closeBtn, A.searchBox
 local keybinds = A.keybinds
@@ -94,22 +95,41 @@ end
 closeBtn.MouseButton1Click:Connect(A.toggleUI)
 
 -- search: filters rows by name, jumps to the first page that has a match --
+-- A count sits in the right of the field, because "the page went blank" and
+-- "nothing matched" look identical otherwise.
+local searchHits = label({
+	Text = "", TextColor3 = T.muted, TextSize = 10, RichText = false,
+	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -10, 0.5, 0),
+	Size = UDim2.fromOffset(66, 14), TextXAlignment = Enum.TextXAlignment.Right,
+	Parent = A.search,
+})
+
 searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 	local q = searchBox.Text:lower()
 	local firstPage
+	local n = 0
 	for _, e in ipairs(A.registry) do
 		if e.row and e.row.Parent then
 			local match = q == "" or e.name:lower():find(q, 1, true) ~= nil
 			e.row.Visible = match
-			if match and q ~= "" and not firstPage then
-				for name, page in pairs(A.pages) do
-					if e.row:IsDescendantOf(page.scroll) then
-						firstPage = name
-						break
+			if match then
+				n += 1
+				if q ~= "" and not firstPage then
+					for name, page in pairs(A.pages) do
+						if e.row:IsDescendantOf(page.scroll) then
+							firstPage = name
+							break
+						end
 					end
 				end
 			end
 		end
+	end
+	if q == "" then
+		searchHits.Text = ""
+	else
+		searchHits.Text = n == 0 and "no hit" or (n .. (n == 1 and " hit" or " hits"))
+		searchHits.TextColor3 = n == 0 and T.bad or T.muted
 	end
 	if firstPage and A.activeTab ~= firstPage then
 		local cur = A.pages[A.activeTab]
@@ -122,6 +142,29 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
 		if not curHas then A.selectPage(firstPage) end
 	end
 end)
+
+-- Keyboard access to the search box: "/" or Ctrl+F focuses it, Escape empties
+-- it and hands focus back. Both are skipped while any text box is focused, so
+-- typing a slash into a value field still types a slash.
+local searchConn = UserInputService.InputBegan:Connect(function(i, gp)
+	if gp or i.UserInputType ~= Enum.UserInputType.Keyboard then return end
+	local focused = UserInputService:GetFocusedTextBox()
+	local kc = i.KeyCode
+	if kc == Enum.KeyCode.Escape then
+		if focused == searchBox then
+			searchBox:ReleaseFocus()
+			searchBox.Text = ""
+		end
+		return
+	end
+	if focused then return end
+	local ctrl = UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+	if kc == Enum.KeyCode.Slash or (ctrl and kc == Enum.KeyCode.F) then
+		if not anyVisible() then A.toggleUI() end
+		searchBox:CaptureFocus()
+	end
+end)
+A.onCleanup(function() searchConn:Disconnect() end)
 
 -- unload ---------------------------------------------------------
 -- core/env.lua registers A.unload before the first file runs (so a failed load can

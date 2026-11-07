@@ -104,6 +104,8 @@ end
 local function magnetStep(dt)
 	local wp, ws = window.AbsolutePosition, window.AbsoluteSize
 	local m = UserInputService:GetMouseLocation()
+	-- pointer is in window space, the control in AbsolutePosition space
+	m = Vector2.new(m.X, m.Y - (A.guiInset or 0))
 	if m.X < wp.X - 48 or m.X > wp.X + ws.X + 48 or m.Y < wp.Y - 48 or m.Y > wp.Y + ws.Y + 48 then return end
 	local k = 1 - math.exp(-dt * 14)
 	for _, it in ipairs(M.items) do

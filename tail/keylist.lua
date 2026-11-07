@@ -30,7 +30,12 @@ end
 
 local function kbAdd(mod)
 	if kbRows[mod] then return end
+	-- A row that is still animating out keeps its wrap in the list; adding the
+	-- same module back inside that 0.33s window used to leave two rows behind.
+	local stale = kbList:FindFirstChild(mod, false)
+	if stale then stale:Destroy() end
 	local wrap = new("Frame", {
+		Name = mod,
 		Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1,
 		LayoutOrder = KB.index[mod] or 99, Parent = kbList,
 	})
@@ -65,7 +70,11 @@ local function kbRemove(mod)
 	task.delay(0.18, function()
 		if not r.wrap.Parent then return end
 		tween(r.wrap, 0.15, { Size = UDim2.new(1, 0, 0, 0) })
-		task.delay(0.15, function() r.wrap:Destroy() end)
+		task.delay(0.15, function()
+			-- kbAdd may have replaced this wrap for the same module in the
+			-- meantime; only the wrapper it still owns should be destroyed
+			if kbRows[mod] == nil and r.wrap.Parent then r.wrap:Destroy() end
+		end)
 	end)
 end
 
