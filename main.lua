@@ -55,9 +55,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-07.35"
+local BUILD = "2026-11-07.36"
 -- monotonic: the updater compares rev, never the date string
-local REV = 35
+local REV = 36
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -313,13 +313,95 @@ local function fail(msg)
 	if type(A.unload) == "function" then pcall(A.unload) end
 end
 
+-- No fetch is waited on forever -----------------------------------------------
+-- A load is forty small files fetched one after another, and every one of them is
+-- a network request. A request that never answers is the one failure mode that
+-- looks exactly like a dead game: the card stops mid-load and nothing happens
+-- again, because the loader thread is still inside HttpGet. That is not a freeze
+-- we can cancel - but we can refuse to be the thread that waits for it.
+--
+-- So each file is fetched on a thread of its own and the loader polls it with a
+-- deadline. A file that misses the deadline is abandoned (it finishes or it does
+-- not; nobody is listening), retried once, and then served from the copy this
+-- executor wrote the last time the *same rev* loaded. The cache path carries the
+-- rev, so a fallback can never hand us code from a different build - it is either
+-- this build's bytes or a clean, reported failure.
+local FETCH_TIMEOUT = 8   -- seconds one file may take before it is abandoned
+local RETRY_TIMEOUT = 15  -- a cold DNS lookup or a dropped first packet deserves more
+local BUDGET = 90         -- the whole load; past this we stop and say so
+
+local CACHE_ROOT = "Aether/cache/" .. tostring(REV) .. "/"
+local cacheReady = false
+local cacheUsable = type(writefile) == "function" and type(readfile) == "function"
+
+local function cachePath(p) return CACHE_ROOT .. (p:gsub("[/\\]", "_")) end
+
+local function cachePrepare()
+	if cacheReady then return cacheUsable end
+	cacheReady = true
+	if not cacheUsable then return false end
+	if type(makefolder) == "function" then
+		pcall(makefolder, "Aether")
+		pcall(makefolder, "Aether/cache")
+		pcall(makefolder, CACHE_ROOT)
+	end
+	return true
+end
+
+local function cacheRead(p)
+	if not cachePrepare() or type(isfile) ~= "function" then return nil end
+	local path = cachePath(p)
+	local ok, isThere = pcall(isfile, path)
+	if not (ok and isThere) then return nil end
+	local okR, body = pcall(readfile, path)
+	if not okR or type(body) ~= "string" or #body == 0 or #body > MAX_BYTES then return nil end
+	return body
+end
+
+local function cacheWrite(p, src)
+	if not cachePrepare() then return end
+	pcall(writefile, cachePath(p), src)
+end
+
+-- one attempt, with a deadline. Returns src, why.
+local function fetchTimed(path, timeout)
+	local done, src, why = false, nil, nil
+	task.spawn(function()
+		local ok, res = pcall(game.HttpGet, game, url(path))
+		if ok and type(res) == "string" then
+			src = res
+		elseif ok then
+			why = "not a text response"
+		else
+			why = tostring(res)
+		end
+		done = true
+	end)
+	local until_ = os.time() + timeout
+	while not done and os.time() < until_ do task.wait(0.05) end
+	if done and type(src) == "string" then return src end
+	return nil, why or ("no answer in " .. tostring(timeout) .. "s")
+end
+
 local function fetch(path)
-	local ok, src = pcall(game.HttpGet, game, url(path))
-	if not ok then return nil, tostring(src) end
-	if type(src) ~= "string" then return nil, "not a text response" end
-	if #src > MAX_BYTES then return nil, string.format("response too large (%d bytes)", #src) end
-	if #src == 0 then return nil, "empty response" end
-	return src
+	local src, why = fetchTimed(path, FETCH_TIMEOUT)
+	if not src then
+		-- a second chance, not the same request again: the first one may have been
+		-- a cold connection that is now warm
+		src, why = fetchTimed(path, RETRY_TIMEOUT)
+	end
+	if src then
+		if #src > MAX_BYTES then return nil, string.format("response too large (%d bytes)", #src) end
+		if #src == 0 then return nil, "empty response" end
+		cacheWrite(path, src)
+		return src
+	end
+	local cached = cacheRead(path)
+	if cached then
+		warn("[Aether] " .. path .. " could not be fetched (" .. tostring(why) .. ") · using this build's cached copy")
+		return cached
+	end
+	return nil, tostring(why)
 end
 
 -- A group loads when that game is *selected* (this shelf) or *detected* (this
@@ -332,10 +414,21 @@ local function loadsWith(group)
 	return detectProfile(A.place) == group
 end
 
+local loadStart = os.time()
 for _, entry in ipairs(FILES) do
 	local path, group = entry[1], entry[2]
 	if loadsWith(group) then
+		if os.time() - loadStart > BUDGET then
+			return fail("network too slow · gave up before " .. path)
+		end
+		local began = os.time()
 		local src, why = fetch(path)
+		local spent = os.time() - began
+		-- a stall is shown, not hidden: "it froze" and "that file is slow" should not
+		-- look the same, and the card is the only place the user can see the second
+		if spent >= 3 and loading then
+			pcall(loading.set, stageCount, string.format("%s · %ds", path, spent))
+		end
 		if not src then
 			return fail("could not download " .. path .. ": " .. tostring(why))
 		end

@@ -1,6 +1,6 @@
 {
-  "rev": 35,
-  "build": "2026-11-07.35",
-  "notes": "Fixes the freeze. Boost assist was writing AssemblyLinearVelocity every frame to a car the server simulates - a replication round trip per frame, which stalls the game. It is now off by default, can never be restored to on by an old config, runs at 15 Hz for the local driver only, and switches itself off within 3s if the speed does not actually rise. The gas poller also dropped to 2 Hz and a scan that finds nothing can no longer repeat more than once every 2.5s.",
+  "rev": 36,
+  "build": "2026-11-07.36",
+  "notes": "Fixes the intermittent freeze at load. It was not the modules - it was the loader waiting on a network request that never answered, which looks identical to a dead game because the card stops mid-load. Every file is now fetched on its own thread with a deadline (8s, one 15s retry), a slow file is named on the card instead of freezing silently, the whole load gives up cleanly after 90s, and a file that still cannot be fetched falls back to the copy this build wrote to Aether/cache/<rev>/ on the last successful load. A fallback can never serve another build's code: the cache path carries the rev.",
   "loader": "main.lua"
 }
