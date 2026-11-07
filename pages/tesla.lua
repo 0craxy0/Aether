@@ -42,11 +42,20 @@ local gasLabel = label({
 	Text = "off", TextColor3 = T.muted, TextSize = 11, TextWrapped = true,
 	Size = UDim2.new(1, 0, 0, 28), Parent = sGas,
 })
-toggle(sGas, "Boost assist (velocity)", true, function(v) A.Tesla.assist.on = v end)
+local assistToggle = toggle(sGas, "Boost assist (velocity)", false, function(v) A.Tesla.assist.on = v end)
+-- Never restored from config. A build where this defaulted to on has already
+-- written "true" into config.json, and replaying that on the next load is exactly
+-- how a car freezes before the user has touched anything. It still saves; it just
+-- always starts off.
+for _, e in ipairs(A.registry) do
+	if e.name == "Boost assist (velocity)" then
+		e.load = function() assistToggle.set(false, true) end
+	end
+end
 slider(sGas, "Assist top speed", 60, 600, 180, function(v) A.Tesla.assist.top = v end)
 label({
-	Text = "A server-owned gas value (NitroMul and friends) is replicated down, so a local write is overwritten and the bar does nothing. "
-		.. "Assist ignores it: while the car is rolling forward it raises the top speed the chassis is allowed to reach.",
+	Text = "Off by default and self-limiting: writing velocity on a car the server simulates is a replication round trip per tick, which lags the game. "
+		.. "Turn it on only if the page says the gas value is server-owned; it disables itself within 3s if the speed does not actually rise.",
 	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
 	Size = UDim2.new(1, 0, 0, 44), Parent = sGas,
 })

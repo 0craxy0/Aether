@@ -83,12 +83,15 @@ TESLA.gas = CG
 -- apart from a successful hold, and boost assist is what makes the effect real
 -- when it happens.
 function CG.scan()
+	if CG.scanning then return CG.live end
+	CG.scanning = true
 	local seat, model = TESLA.vehicle()
 	local live = {}
 	CG.live = live
 	CG.seat = seat
 	CG.mirrored = 0
 	if not model then
+		CG.scanning = false
 		CG.status = "not in a vehicle"
 		return live
 	end
@@ -121,7 +124,14 @@ function CG.scan()
 
 	scanAttrs(model)
 	scanAttrs(seat)
-	for _, d in ipairs(model:GetDescendants()) do scanAttrs(d) end
+	-- a hard cap: a vehicle that is really a 5,000-part map is not something to
+	-- walk five times a second, and no boost value lives past the first 800 parts
+	local budget = 800
+	for _, d in ipairs(model:GetDescendants()) do
+		budget -= 1
+		if budget <= 0 then break end
+		scanAttrs(d)
+	end
 	scanValues(model)
 
 	-- player side: character attributes and anything nitro-shaped in the pack
@@ -141,6 +151,7 @@ function CG.scan()
 	else
 		CG.status = string.format("%d value%s · %s", #live, #live == 1 and "" or "s", live[1].name)
 	end
+	CG.scanning = false
 	return live
 end
 
@@ -206,13 +217,21 @@ function CG.apply()
 end
 
 -- Boost assist ----------------------------------------------------------------
--- The fallback that actually moves the car. A client-owned assembly can be given
--- velocity directly, so this does not care what the game calls its nitro, who
--- owns the attribute, or whether the bar ever refills: while the car is already
--- rolling forward, add a bounded amount of speed along its own look vector, up to
--- a ceiling the user sets. The chassis still does the driving - this only raises
--- the top speed it is allowed to reach.
-local ASSIST = { on = true, top = 180, accel = 70 }
+-- The fallback that can move a car the game's own gas value cannot. It is OFF by
+-- default, and deliberately timid, because writing AssemblyLinearVelocity on an
+-- assembly the *server* simulates is not a boost - it is a replication round trip
+-- per frame, which is how a car game freezes. So:
+--
+--   * opt-in, never restored into the "on" state by a config from an old build
+--   * 15 Hz, not per frame, with a small per-tick delta
+--   * only while the local player is the driver and the car is already rolling
+--   * a watchdog that measures the speed it actually produced: if two and a half
+--     seconds of pushing bought less than 4 studs/s, the server owns the car,
+--     the assist switches itself off and says why. No freeze can outlive that.
+local ASSIST = {
+	on = false, top = 180, accel = 70,
+	acc = 0, watchFrom = nil, watchAt = 0, dead = false,
+}
 TESLA.assist = ASSIST
 
 function CG.set(on)
@@ -226,28 +245,63 @@ function CG.set(on)
 		return
 	end
 	CG.scan()
+	CG.scanAt = os.clock()
 	CG.conn = RunService.Heartbeat:Connect(function(dt)
-		-- the assist runs every frame (it is one dot product); the value poller
-		-- runs four times a second, which is plenty for a bar that drains slowly
-		if ASSIST.on then
-			local _, model, root = TESLA.vehicle()
-			if root and model then
-				local look = root.CFrame.LookVector
-				local v = root.AssemblyLinearVelocity
-				local fwd = v:Dot(look)
-				-- never from a standstill and never in reverse: this is extra top
-				-- speed, not a rocket strapped to a parked car
-				if fwd > 8 and fwd < ASSIST.top then
-					local add = math.min(ASSIST.top - fwd, ASSIST.accel * dt)
-					pcall(function() root.AssemblyLinearVelocity = v + look * add end)
+		if ASSIST.on and not ASSIST.dead then
+			ASSIST.acc += dt
+			if ASSIST.acc >= 1 / 15 then
+				local step = ASSIST.acc
+				ASSIST.acc = 0
+				local seat, model, root = TESLA.vehicle()
+				local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+				-- driver only: a passenger cannot drive, and writing velocity from
+				-- a seat you do not control is the fastest way to fight physics
+				if root and model and seat and hum and seat.Occupant == hum then
+					local look = root.CFrame.LookVector
+					local v = root.AssemblyLinearVelocity
+					local fwd = v:Dot(look)
+					if fwd > 8 and fwd < ASSIST.top - 2 then
+						local add = math.min(ASSIST.top - fwd, ASSIST.accel * step)
+						local ok = pcall(function() root.AssemblyLinearVelocity = v + look * add end)
+						if not ok then
+							ASSIST.dead = true
+							ASSIST.on = false
+						else
+							local now = os.clock()
+							if not ASSIST.watchFrom then
+								ASSIST.watchFrom, ASSIST.watchAt = fwd, now
+							elseif now - ASSIST.watchAt > 2.5 then
+								if fwd - ASSIST.watchFrom < 4 then
+									ASSIST.dead = true
+									ASSIST.on = false
+									notify("Cold gas", "assist cannot move this car · server-owned. Disabled.", "bad")
+								else
+									ASSIST.watchFrom, ASSIST.watchAt = fwd, now
+								end
+							end
+						end
+					else
+						ASSIST.watchFrom = nil -- coasting or at the ceiling: not our window
+					end
 				end
 			end
 		end
 
 		CG.acc += dt
-		if CG.acc < 0.2 then return end
+		-- twice a second: a bar that drains over seconds does not need more, and
+		-- every write here is a replicated property change
+		if CG.acc < 0.5 then return end
 		CG.acc = 0
-		if #CG.live == 0 or TESLA.seat() ~= CG.seat then CG.scan() end
+		-- A car with no gas value at all used to rescan five times a second for as
+		-- long as the toggle was on. That is a full descendant walk of the model,
+		-- the character and the backpack, five times a second, forever.
+		local seatNow = TESLA.seat()
+		local stale = seatNow ~= CG.seat
+		local idle = #CG.live == 0 and (os.clock() - (CG.scanAt or 0)) > 2.5
+		if stale or idle then
+			CG.scan()
+			CG.scanAt = os.clock()
+		end
 		CG.apply()
 	end)
 end

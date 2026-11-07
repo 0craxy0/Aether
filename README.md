@@ -63,10 +63,11 @@ The Tesla page is two tools and a camera:
   `gas`/`boost`/`nitro`/`turbo`/`charge` at the highest value it has ever had;
   boolean flags with those names are held true. `Scan gas values` prints every
   candidate. If a write does not stick (a value the server replicates down -
-  `NitroMul` is exactly that), the page says *server-owned* and the second layer
-  takes over: **boost assist** raises the car's own top speed while it is rolling
-  forward, which needs no permission from the game. `Assist top speed` is the
-  ceiling; 180 is roughly a fast supercar.
+  `NitroMul` is exactly that), the page says *server-owned* and you can switch on
+  **boost assist**: it raises the car's own top speed while it is rolling forward.
+  It is off by default and never restored by config, because writing velocity on a
+  server-simulated car costs a replication round trip per tick - it runs at 15 Hz,
+  only for the driver, and disables itself within 3s if the speed does not rise.
 - **Auto-pilot** - middle-click the spot you want on the map. A scriptable camera
   takes over, orbiting the point so you can see what you picked; the scroll wheel
   raises it (`Destination height` in the page follows the wheel). `Drive` (or
