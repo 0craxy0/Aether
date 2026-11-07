@@ -25,7 +25,7 @@ local LIST = {
 	},
 	{
 		key = "universal", name = "Universal", place = nil,
-		blurb = "Every module in one shelf, for games nobody has tuned yet.",
+		blurb = "The generic shelf - character, ESP, movement, actions - plus the detected game's own modules, if it has any.",
 	},
 }
 
@@ -42,27 +42,44 @@ function A.profileIs(key)
 	return A.profile == key
 end
 
--- True for the two shelves that carry the combat modules.
+-- True when the combat shelf is actually present here (selected or detected).
 function A.hasCombat()
-	return A.profile == "arsenal" or A.profile == "universal"
+	return A.allows("arsenal")
 end
 
--- The Tesla car tools: universal carries them too, because "every feature" is
--- what universal promises - they simply find no vehicle in a game without cars.
+-- The Tesla car tools: universal carries them only when this place actually is
+-- the Tesla game (see A.allows), so the page cannot appear where there is no car
+-- to drive.
 function A.hasVehicleTools()
-	return A.profile == "tesla" or A.profile == "universal"
+	return A.allows("tesla")
 end
 
--- Persisted override. A restart is required because the file list was decided at
--- fetch time; the Games page offers the restart in the same click.
+-- Is this group allowed here? Loaded when the shelf says so, or when the place
+-- itself says so. A shelf chosen in a different game can never be why a tab is
+-- on screen - that is the rule the loader applies to the file list, kept here in
+-- one place so the UI and the modules cannot disagree.
+function A.allows(group)
+	if not group then return true end
+	if A.profile == group then return true end
+	if A.detectProfile and A.detectProfile(A.place or game.PlaceId) == group then return true end
+	return false
+end
+
+-- Persisted override, pinned to the place it was chosen for.
 function A.forceProfile(key)
 	if not A.games[key] then return false end
-	if getgenv then getgenv().AetherGame = key end
+	if getgenv then
+		getgenv().AetherGame = key
+		getgenv().AetherGameFor = A.place or game.PlaceId
+	end
 	return true
 end
 
 function A.clearProfile()
-	if getgenv then getgenv().AetherGame = nil end
+	if getgenv then
+		getgenv().AetherGame = nil
+		getgenv().AetherGameFor = nil
+	end
 end
 
 -- Follow the place ------------------------------------------------------------
@@ -81,7 +98,10 @@ task.spawn(function()
 			last = now
 			A.place = now
 			local want = (A.detectProfile and A.detectProfile(now)) or "universal"
-			if getgenv then getgenv().AetherGame = nil end
+			if getgenv then
+				getgenv().AetherGame = nil
+				getgenv().AetherGameFor = nil
+			end
 			if want ~= A.profile then
 				if A.notify then
 					A.notify("Games", "place changed · loading " .. ((A.games[want] or {}).name or want), "good")

@@ -55,9 +55,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-07.32"
+local BUILD = "2026-11-07.33"
 -- monotonic: the updater compares rev, never the date string
-local REV = 32
+local REV = 33
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -88,13 +88,20 @@ A.placeIds = PLACE_IDS
 A.detectProfile = detectProfile
 A.place = game.PlaceId
 -- The override exists for a game whose id is not in the table yet (or for
--- testing a shelf from a place it was not written for). It is cleared the moment
--- the place changes, so "forced" never survives into a game it was not about.
+-- testing a shelf from a place it was not written for). It is remembered with
+-- the place it was chosen for: an override that outlived its game is how a
+-- Tesla tab ends up sitting in Arsenal. Anything from another place is dropped
+-- on the way up, so the shelf is always either selected here or detected here.
 local forced = getgenv and getgenv().AetherGame
+local forcedFor = getgenv and getgenv().AetherGameFor
 local key
-if forced == "arsenal" or forced == "tesla" or forced == "universal" then
+if (forced == "arsenal" or forced == "tesla" or forced == "universal") and forcedFor == A.place then
 	key = forced
 else
+	if forced and getgenv then
+		getgenv().AetherGame = nil
+		getgenv().AetherGameFor = nil
+	end
 	key = detectProfile(A.place)
 end
 A.profile = key
@@ -315,11 +322,14 @@ local function fetch(path)
 	return src
 end
 
--- no group = core; universal carries every group by design
+-- A group loads when that game is *selected* (this shelf) or *detected* (this
+-- place). Everything else is generic. That is what keeps a Tesla tab out of
+-- Arsenal and an aimbot page out of a game that has no shelf at all: on an
+-- unsupported place, universal gets the generic tools and nothing else.
 local function loadsWith(group)
 	if not group then return true end
-	if A.profile == "universal" then return true end
-	return group == A.profile
+	if key == group then return true end
+	return detectProfile(A.place) == group
 end
 
 for _, entry in ipairs(FILES) do

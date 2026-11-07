@@ -1,4 +1,8 @@
 local A = ...
+-- The Tesla tab exists only where the module does. The loader already filters the
+-- file by shelf/detection; this is the same promise made locally, so a mismatch
+-- costs a missing tab instead of a nil-index on the first row.
+if not A.Tesla then return end
 local makePage, toggle, slider, dropdown, button = A.makePage, A.toggle, A.slider, A.dropdown, A.button
 local label, new, rowBase = A.label, A.new, A.rowBase
 local T, FONT, notify = A.T, A.FONT, A.notify

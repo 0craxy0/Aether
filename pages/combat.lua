@@ -1,6 +1,10 @@
 -- Combat page: Aimbot, Silent aim, Kill aura.
 -- Requires A.Aim, A.SA and A.KA from the modules loaded before it.
 local A = ...
+-- Belt and braces: the loader only fetches this file for the Arsenal shelf, but
+-- a page must never exist without the modules it drives. If this returns, there
+-- is no Combat tab to click into a nil error.
+if not (A.Aim and A.SA and A.KA and A.projectile) then return end
 local makePage, makeConfig, gear = A.makePage, A.makeConfig, A.gear
 local slider, toggle, dropdown = A.slider, A.toggle, A.dropdown
 local Aim, SA = A.Aim, A.SA

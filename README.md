@@ -42,13 +42,17 @@ what changes:
 |---|---|---|
 | `arsenal` | `286090429` | combat (aim, silent aim, kill aura, projectile counter), visuals, movement |
 | `tesla` | `1794074302239` | vehicle tools only - cold gas, auto-pilot |
-| `universal` | anything else | every module in one shelf, none of it calibrated |
+| `universal` | anything else | generic tools (character, ESP, movement, actions) + the detected game's own set, if it has one |
 
-Universal is the honest default: an untested game gets the whole toolbox, and the
-Games page says so rather than implying a tune it does not have. The shelf shows
-as a pill in the header; the Games page lists all three and restarts into the one
-you pick (config is flushed first, same path the updater uses). `getgenv().AetherGame`
-overrides detection for a place that is not in the table.
+A group of game-specific files loads only when that game is **detected** here or
+**selected** for this place - so a Tesla tab cannot appear in Arsenal, and a game
+with no shelf gets the generic tools and nothing else. A manual shelf choice is
+pinned to the place it was made for; the next teleport returns to auto-detect.
+Both pages also refuse to build without their modules, so a tab can never exist
+without the code behind it. The shelf shows as a pill in the header; the Games
+page lists all three and restarts into the one you pick (config is flushed first,
+same path the updater uses). `getgenv().AetherGame` overrides detection for a
+place that is not in the table.
 
 ## flying tesla roadster
 
