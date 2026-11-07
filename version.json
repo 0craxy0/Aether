@@ -1,6 +1,6 @@
 {
-  "rev": 40,
-  "build": "2026-11-07.40",
-  "notes": "Adds Internet Tycoon (place 10767564282) as its own shelf: modules/tycoon.lua and pages/tycoon.lua, wired into the loader's place table, the forced-profile allowlist and the Games list. Two features. Money finds the balance where a tycoon keeps it (leaderstats, a folder on the player, a player attribute), puts the real value in an editable box, writes it, reads it back, and can keep re-applying it every 0.35s - the only part of a server-reconciled number a client can hold. Thunderstorms find every weather/storm/thunder/rain value or attribute visible on Lighting, the player, workspace and ReplicatedStorage, pin them to calm once a second while on, and switch off running lightning and thunder effects (Enabled = false, saved and restored, never deleted).",
+  "rev": 41,
+  "build": "2026-11-07.41",
+  "notes": "The Internet Tycoon money scan no longer gives up when the balance is not named obviously. It now sweeps the player three levels deep, the character, workspace three levels deep (where a plot model usually lives) and ReplicatedStorage two levels deep, on a 4000-node budget, collecting every numeric value and attribute. Money-named hits are ranked and auto-bound; everything else it saw is listed in the page with a USE button, so a balance the game called Total or Value can be picked by hand and behaves exactly like an auto-detected one afterwards.",
   "loader": "main.lua"
 }

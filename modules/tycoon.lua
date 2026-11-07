@@ -16,10 +16,17 @@ local function flat(name)
 end
 
 -- money ----------------------------------------------------------------------
--- The balance is one of: a leaderstats value, a value in a folder on the player,
--- or a player attribute. Those are the three places a tycoon keeps a number a
--- client script is expected to be able to read.
-local MONEY_WORDS = { "cash", "money", "dollar", "fund", "balance", "coin", "bank" }
+-- A tycoon can keep the balance in four different places and this game is not the
+-- one that documents which: leaderstats, a folder on the player, a player
+-- attribute - or, very often, on the plot model the player owns, under workspace.
+-- So the scan is wide on purpose and bounded by a budget, and when nothing is
+-- named obviously enough to auto-pick, everything numeric it saw is offered as a
+-- list to choose from. A picker that shows the game's own numbers beats a module
+-- guessing at them.
+local MONEY_WORDS = {
+	"cash", "money", "dollar", "fund", "balance", "coin", "bank",
+	"income", "profit", "networth", "worth", "budget", "wallet", "credit", "salar",
+}
 
 local function moneyRank(name)
 	local n = flat(name)
@@ -30,8 +37,20 @@ local function moneyRank(name)
 	return nil
 end
 
-local M = { entry = nil, base = nil, target = nil, lockOn = false, conn = nil }
+local M = { entry = nil, base = nil, target = nil, lockOn = false, list = {} }
 TY.money = M
+
+local function pathOf(inst, name)
+	local parts = { tostring(name) }
+	local node = inst
+	for _ = 1, 3 do
+		if not node or node == LP or node == workspace or node:IsA("DataModel") then break end
+		node = node.Parent
+		if not node or node == LP or node == workspace or node:IsA("DataModel") then break end
+		table.insert(parts, 1, node.Name)
+	end
+	return table.concat(parts, ".")
+end
 
 function M.read(e)
 	e = e or M.entry
@@ -47,53 +66,88 @@ end
 function M.where(e)
 	e = e or M.entry
 	if not e then return "not found" end
-	if e.kind == "attr" then return tostring(e.name) .. " · attribute" end
-	local parent, path = e.inst.Parent, tostring(e.name)
-	if parent and parent ~= LP then
-		path = parent.Name .. "." .. path
-		if parent.Parent and parent.Parent ~= LP then path = parent.Parent.Name .. "." .. path end
-	end
-	return path .. " · value"
+	return pathOf(e.inst, e.name) .. (e.kind == "attr" and " · attribute" or " · value")
 end
 
-function M.find()
-	local best, bestRank = nil, nil
+-- wide, budgeted sweep. Returns every numeric candidate it met: money-named ones
+-- first, then the rest, so a number the game named "Total" is still reachable.
+function M.gather()
+	local named, others, seen = {}, {}, {}
+	local budget = { n = 4000 }
 
-	local function consider(inst, kind, name)
-		local rank = moneyRank(name)
-		if not rank then return end
-		if best and bestRank and rank >= bestRank then return end
-		local v
-		if kind == "attr" then
-			local ok, got = pcall(inst.GetAttribute, inst, name)
-			v = ok and got or nil
-		else
-			local ok, got = pcall(function() return inst.Value end)
-			v = ok and got or nil
+	local function rankOf(name) return moneyRank(name) end
+
+	local function consider(inst, kind, name, value)
+		if type(value) ~= "number" then return end
+		local key = tostring(inst) .. "|" .. tostring(name) .. kind
+		if seen[key] then return end
+		seen[key] = true
+		local entry = { inst = inst, kind = kind, name = name, value = value, rank = rankOf(name) }
+		if entry.rank then
+			named[#named + 1] = entry
+		elseif #others < 60 then
+			others[#others + 1] = entry
 		end
-		if type(v) ~= "number" then return end
-		best, bestRank = { inst = inst, kind = kind, name = name, value = v }, rank
 	end
 
-	local okA, attrs = pcall(LP.GetAttributes, LP)
-	if okA and type(attrs) == "table" then
-		for k in pairs(attrs) do consider(LP, "attr", k) end
-	end
-	for _, child in ipairs(LP:GetChildren()) do
-		if child:IsA("NumberValue") or child:IsA("IntValue") then
-			consider(child, "value", child.Name)
-		elseif child:IsA("Folder") or child:IsA("Configuration") or child:IsA("Model") then
-			for _, sub in ipairs(child:GetChildren()) do
-				if sub:IsA("NumberValue") or sub:IsA("IntValue") then
-					consider(sub, "value", sub.Name)
-				end
+	local function scan(inst, depth)
+		budget.n -= 1
+		if budget.n <= 0 or not inst then return end
+		local okA, a = pcall(inst.GetAttributes, inst)
+		if okA and type(a) == "table" then
+			for k, v in pairs(a) do consider(inst, "attr", k, v) end
+		end
+		if depth <= 0 then return end
+		local okK, kids = pcall(function() return inst:GetChildren() end)
+		if not okK then return end
+		for _, child in ipairs(kids) do
+			budget.n -= 1
+			if budget.n <= 0 then return end
+			if child:IsA("NumberValue") or child:IsA("IntValue") then
+				local okV, v = pcall(function() return child.Value end)
+				consider(child, "value", child.Name, okV and v or nil)
+			elseif child:IsA("Model") or child:IsA("Folder") or child:IsA("Configuration") then
+				scan(child, depth - 1)
 			end
 		end
 	end
 
+	scan(LP, 3)
+	scan(LP.Character, 1)
+	scan(workspace, 3)
+	scan(game:GetService("ReplicatedStorage"), 2)
+
+	table.sort(named, function(a, b)
+		if a.rank ~= b.rank then return a.rank < b.rank end
+		return tostring(a.name) < tostring(b.name)
+	end)
+	table.sort(others, function(a, b) return tostring(a.name) < tostring(b.name) end)
+
+	local out = {}
+	for _, e in ipairs(named) do out[#out + 1] = e end
+	for _, e in ipairs(others) do out[#out + 1] = e end
+	M.list = out
+	return out
+end
+
+function M.find()
+	local all = M.gather()
+	local best = nil
+	for _, e in ipairs(all) do
+		if e.rank then best = e; break end
+	end
 	M.entry = best
 	M.base = best and best.value or nil
 	return best
+end
+
+-- bind one of the offered candidates by hand. The value in the box follows, so a
+-- manual choice behaves exactly like an auto-detected one afterwards.
+function M.bind(e)
+	if not e then return false end
+	M.entry = e
+	M.base = e.value
+	return true
 end
 
 -- write, then read back. Tycoons usually reconcile money on the server, so a

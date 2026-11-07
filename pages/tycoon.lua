@@ -60,7 +60,7 @@ local function syncMoney(force)
 		end
 	else
 		balanceSub.Text = "not found"
-		moneyWhere.Text = "No balance on this player yet. Press SCAN once the money HUD has drawn."
+		moneyWhere.Text = "Nothing auto-matched. Press SCAN - everything numeric it finds is listed below to pick from."
 	end
 end
 
@@ -104,8 +104,79 @@ end)
 button(sMoney, "Find the balance", "SCAN", function()
 	local e = TY.money.find()
 	syncMoney(true)
-	notify("Money", e and ("found " .. TY.money.where(e)) or "no balance on this player", e and "good" or "bad")
+	rebuildCandidates()
+	notify("Money", e and ("found " .. TY.money.where(e)) or "nothing auto-matched · pick one below", e and "good" or "bad")
 end)
+
+-- The picker: everything numeric the wide scan met, so a balance the game named
+-- "Total" or "Value" is still reachable instead of dead-ending on "not found".
+local candHolder = new("Frame", {
+	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundTransparency = 1, Parent = sMoney,
+}, { new("UIListLayout", { Padding = UDim.new(0, 4), SortOrder = Enum.SortOrder.LayoutOrder }) })
+
+local function shortValue(v)
+	if type(v) ~= "number" then return tostring(v) end
+	if math.abs(v) >= 1e6 then return string.format("%.2fM", v / 1e6) end
+	if math.abs(v) >= 1e4 then return string.format("%.1fK", v / 1e3) end
+	return tostring(math.floor(v))
+end
+
+function rebuildCandidates() -- luacheck: ignore
+	for _, c in ipairs(candHolder:GetChildren()) do
+		if not c:IsA("UIListLayout") then c:Destroy() end
+	end
+	local list = TY.money.list or {}
+	if #list == 0 then return end
+	local shown = 0
+	for i, e in ipairs(list) do
+		if shown >= 12 then break end
+		-- the auto-pick is already bound; showing it again as a choice is noise
+		if e ~= TY.money.entry then
+			shown += 1
+			local row = rowBase(candHolder, 34)
+			row.LayoutOrder = shown
+			label({
+				Text = tostring(e.name) .. (e.rank and "" or "  (unnamed match)"),
+				Font = FONT.med, TextSize = 11,
+				Position = UDim2.fromOffset(11, 3), Size = UDim2.new(1, -78, 0, 14), Parent = row,
+			})
+			label({
+				Text = TY.money.where(e) .. "  ·  " .. shortValue(e.value), TextColor3 = T.muted, TextSize = 9,
+				Position = UDim2.fromOffset(11, 18), Size = UDim2.new(1, -78, 0, 13),
+				TextTruncate = Enum.TextTruncate.AtEnd, Parent = row,
+			})
+			local use = new("TextButton", {
+				Text = "USE", Font = FONT.bold, TextSize = 9, TextColor3 = T.text,
+				BackgroundColor3 = T.stroke, AutoButtonColor = false, BorderSizePixel = 0,
+				AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0),
+				Size = UDim2.fromOffset(56, 22), Parent = row,
+			}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
+			use.MouseEnter:Connect(function() tween(use, 0.12, { BackgroundColor3 = T.accent }) end)
+			use.MouseLeave:Connect(function() tween(use, 0.12, { BackgroundColor3 = T.stroke }) end)
+			use.MouseButton1Click:Connect(function()
+				sfx("tap")
+				TY.money.bind(e)
+				syncMoney(true)
+				rebuildCandidates()
+				notify("Money", "using " .. TY.money.where(e), "good")
+			end)
+		end
+	end
+	if shown == 0 then
+		label({
+			Text = "Nothing numeric found — the balance is not on this client at all.",
+			TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+			Size = UDim2.new(1, 0, 0, 24), Parent = candHolder,
+		})
+	else
+		label({
+			Text = "Pick the one that is the balance. It becomes the bound value, and the box above follows it.",
+			TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+			Size = UDim2.new(1, 0, 0, 24), Parent = candHolder,
+		})
+	end
+end
 
 label({
 	Text = "A tycoon reconciles money on the server. The write lands on your client's copy, and it is the copy the HUD reads - "
@@ -195,6 +266,7 @@ label({
 
 -- one loop for both readouts; typing is never overwritten
 syncMoney(true)
+rebuildCandidates()
 TY.storm.find()
 syncStorm()
 
