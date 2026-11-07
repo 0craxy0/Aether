@@ -362,15 +362,30 @@ local function pickPoint()
 	return hit and hit.Position or nil
 end
 
-local function previewCFrame()
-	local d = AP.dest or Vector3.zero
-	-- fixed oblique: high enough to read the street, far enough to see the block
-	return CFrame.lookAt(d + Vector3.new(0, 26, 46), d)
+-- The preview never takes the camera ------------------------------------------
+-- It used to park a scriptable Camera over the destination so the spot could be
+-- seen from above. Two things made that a bad trade: the game's camera module
+-- detaches from a camera it did not create, and if it destroys the old one there
+-- is nothing left to hand the view back to - which is exactly the "camera is
+-- stuck at one spot while the car drives off" report. The destination is shown in
+-- the world instead: a tag on it, and a beam from the ground up to it, so the
+-- height the slider sets is legible without touching anybody's view.
+local function beamUpdate()
+	local b = AP.beam
+	if not b then return end
+	if not (AP.base and AP.dest) then
+		b.Transparency = 1
+		return
+	end
+	local h = math.max(AP.dest.Y - AP.base.Y, 0.2)
+	b.Size = Vector3.new(0.35, h, 0.35)
+	b.Position = Vector3.new(AP.dest.X, AP.base.Y + h / 2, AP.dest.Z)
+	b.Transparency = 0.45
 end
 
 local function refreshPreview()
 	if AP.part then pcall(function() AP.part.Position = AP.dest end) end
-	if AP.cam then pcall(function() AP.cam.CFrame = previewCFrame() end) end
+	beamUpdate()
 	local o = AP.overlay
 	if o and o.info then
 		local _, _, root = TESLA.vehicle()
@@ -413,9 +428,14 @@ local function teardownPreview()
 	AP.overlay = nil
 	if AP.part then pcall(function() AP.part:Destroy() end) end
 	AP.part = nil
+	if AP.beam then pcall(function() AP.beam:Destroy() end) end
+	AP.beam = nil
 	if AP.cam then pcall(function() AP.cam:Destroy() end) end
 	AP.cam = nil
-	if AP.savedCam and AP.savedCam.Parent then
+	-- safety net only: an older build could leave a scriptable camera in place, and
+	-- the view has to come back to the game's own camera if that ever happens
+	if AP.savedCam and AP.savedCam.Parent and AP.savedCam:IsA("Camera")
+		and workspace.CurrentCamera ~= AP.savedCam then
 		pcall(function() workspace.CurrentCamera = AP.savedCam end)
 	end
 	AP.savedCam = nil
@@ -440,17 +460,21 @@ function AP.pick(at)
 	end
 	AP.base = point
 	AP.picking = true
+	-- the view is never reassigned: the game's camera stays the game's camera, so
+	-- the moment Drive is pressed it keeps working as a chase camera
 	AP.savedCam = workspace.CurrentCamera
-
-	local cam = new("Camera", { Name = "AetherPickCam", CameraType = Enum.CameraType.Scriptable, FieldOfView = 70, Parent = workspace })
-	AP.cam = cam
-	workspace.CurrentCamera = cam
 
 	local part = new("Part", {
 		Name = "AetherDestination", Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false,
 		CastShadow = false, Transparency = 1, Size = Vector3.new(1, 1, 1), Parent = workspace,
 	})
 	AP.part = part
+	local beam = new("Part", {
+		Name = "AetherDestinationBeam", Anchored = true, CanCollide = false, CanQuery = false, CanTouch = false,
+		CastShadow = false, Material = Enum.Material.Neon,
+		Color = T.accent, Transparency = 0.45, Size = Vector3.new(0.35, 1, 0.35), Parent = workspace,
+	})
+	AP.beam = beam
 	local bb = new("BillboardGui", {
 		Name = "tag", Adornee = part, AlwaysOnTop = true, Size = UDim2.fromOffset(170, 22),
 		StudsOffset = Vector3.new(0, 2.2, 0), Parent = part,

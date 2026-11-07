@@ -56,7 +56,7 @@ place that is not in the table.
 
 ## flying tesla roadster
 
-The Tesla page is two tools and a camera:
+The Tesla page is two tools and a marker:
 
 - **Cold gas** - two layers, because one is not enough. The poller holds every
   number in the car, on it, or in the backpack whose name looks like
@@ -68,10 +68,12 @@ The Tesla page is two tools and a camera:
   It is off by default and never restored by config, because writing velocity on a
   server-simulated car costs a replication round trip per tick - it runs at 15 Hz,
   only for the driver, and disables itself within 3s if the speed does not rise.
-- **Auto-pilot** - middle-click the spot you want on the map. A scriptable camera
-  takes over, orbiting the point so you can see what you picked; the scroll wheel
-  raises it (`Destination height` in the page follows the wheel). `Drive` (or
-  Enter) hands it to the controller, `Cancel` (or Escape) puts your camera back.
+- **Auto-pilot** - middle-click the spot you want on the map. The destination is
+  marked in the world - a tag on the point and a beam from the ground up to it -
+  and the scroll wheel raises it (`Destination height` in the page follows the
+  wheel). The camera is deliberately left alone: the game's own chase camera keeps
+  working, so `Drive` (or Enter) can start the run without the view ever being
+  somewhere you did not put it. `Cancel` (or Escape) clears the marker.
   Default is `Seat inputs`: throttle and steer on the `VehicleSeat`, scaled by
   distance and aimed by heading error, with a short reverse manoeuvre instead of
   looping the block. `Velocity assist` pushes the assembly for custom chassis.
