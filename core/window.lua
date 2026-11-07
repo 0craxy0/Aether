@@ -169,7 +169,7 @@ end
 
 -- keep the tab that just became active inside the viewport, with a little air
 function A.revealTab(btn)
-	if not btn or sidebar.AbsoluteSize.Y <= 0 then return end
+	if not (btn and btn.Parent and sidebar.AbsoluteSize.Y > 0) then return end
 	local y = btn.AbsolutePosition.Y - sidebar.AbsolutePosition.Y + sidebar.CanvasPosition.Y
 	local h = btn.AbsoluteSize.Y
 	local viewH = sidebar.AbsoluteSize.Y

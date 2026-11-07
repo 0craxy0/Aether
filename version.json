@@ -1,6 +1,6 @@
 {
-  "rev": 33,
-  "build": "2026-11-07.33",
-  "notes": "Game-specific tabs and modules now load only when that game is detected in this place or explicitly selected for it. A manual shelf choice is pinned to the place it was made for, so a forced Arsenal profile cannot leave a Tesla tab behind after a teleport. The Combat and Tesla pages also refuse to build without their modules, so a tab can never exist without the code behind it.",
+  "rev": 34,
+  "build": "2026-11-07.34",
+  "notes": "Fixed the load crash (sidebar reveal indexed a loop variable that was already out of scope). Cold gas now explains itself: NitroMul is server-owned, so a local write is overwritten on the next replication - the module detects that and says so, then boost assist carries the effect by raising the car's own top speed while it is rolling. Scan also looks at the character, backpack and nitro tools, and holds boolean boost flags true.",
   "loader": "main.lua"
 }

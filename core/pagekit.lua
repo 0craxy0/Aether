@@ -60,7 +60,15 @@ local function selectPage(name)
 		tween(page.btn, 0.25, { TextColor3 = on and T.accent or T.muted })
 		tween(page.btn, 0.25, { BackgroundTransparency = on and 0.82 or 1, BackgroundColor3 = T.accent })
 	end
-	if A.revealTab then pcall(A.revealTab, page.btn) end
+	-- scroll the sidebar so the tab we just switched to is inside the viewport.
+	-- Look the button up from the page list: the loop above scopes `page` to
+	-- itself, and reaching for it out here is a nil index at load time.
+	for _, page in pairs(pages) do
+		if page.btn.Text == name then
+			if A.revealTab then pcall(A.revealTab, page.btn) end
+			break
+		end
+	end
 	A.refreshPages(name)
 end
 A.selectPage = selectPage

@@ -58,11 +58,15 @@ place that is not in the table.
 
 The Tesla page is two tools and a camera:
 
-- **Cold gas** - a poller, not a packet. Every number in the car, or attribute on
-  it, whose name looks like `gas`/`boost`/`nitro`/`turbo`/`charge` is held at the
-  highest value it has ever had. Nothing is invented, so a 100-charge bar stays at
-  100 and a 0..1 multiplier stays at its maximum. `Scan gas values` prints every
-  candidate it found, which is the list you want if a future update renames it.
+- **Cold gas** - two layers, because one is not enough. The poller holds every
+  number in the car, on it, or in the backpack whose name looks like
+  `gas`/`boost`/`nitro`/`turbo`/`charge` at the highest value it has ever had;
+  boolean flags with those names are held true. `Scan gas values` prints every
+  candidate. If a write does not stick (a value the server replicates down -
+  `NitroMul` is exactly that), the page says *server-owned* and the second layer
+  takes over: **boost assist** raises the car's own top speed while it is rolling
+  forward, which needs no permission from the game. `Assist top speed` is the
+  ceiling; 180 is roughly a fast supercar.
 - **Auto-pilot** - middle-click the spot you want on the map. A scriptable camera
   takes over, orbiting the point so you can see what you picked; the scroll wheel
   raises it (`Destination height` in the page follows the wheel). `Drive` (or

@@ -67,40 +67,73 @@ local CG = {
 }
 TESLA.gas = CG
 
--- One-off discovery. Attributes first (that is how a modern car exposes boost),
--- then Value objects anywhere in the model (that is how an older one does it).
--- Each hit keeps the value it was born with as its floor, and the floor rises if
--- the game ever hands out more - so a 100-charge bar stays at 100 and a 0..1
--- multiplier stays at its maximum instead of being replaced by a made-up number.
+-- One-off discovery. Attributes first, then Value objects - and not only on the
+-- car: a nitro bottle is a Tool, and a game that tracks the bar per player keeps
+-- it on the character or in the backpack. A numeric hit keeps the value it was
+-- born with as its floor, and the floor rises if the game ever hands out more, so
+-- a 100-charge bar stays at 100 instead of being replaced by an invented number.
+--
+-- Booleans with the same words ("NitroActive", "Boosting") are remembered too:
+-- if the game gates the effect on a flag, holding it true is the whole trick.
+--
+-- Neither of those can beat a value the *server* owns. NitroMul is exactly that
+-- case: it is replicated down, the car's speed is computed on the server, and a
+-- local SetAttribute is overwritten on the next replication - which looks like
+-- "the toggle does nothing". The miss counter in apply() is how we tell that
+-- apart from a successful hold, and boost assist is what makes the effect real
+-- when it happens.
 function CG.scan()
 	local seat, model = TESLA.vehicle()
 	local live = {}
 	CG.live = live
 	CG.seat = seat
+	CG.mirrored = 0
 	if not model then
 		CG.status = "not in a vehicle"
 		return live
 	end
 
 	local function add(inst, kind, name, value)
-		live[#live + 1] = { inst = inst, kind = kind, name = name, max = value }
+		live[#live + 1] = { inst = inst, kind = kind, name = name, max = value, miss = 0 }
 	end
 
-	for _, inst in ipairs({ model, seat }) do
-		if inst then
-			local ok, attrs = pcall(function() return inst:GetAttributes() end)
-			if ok and type(attrs) == "table" then
-				for k, v in pairs(attrs) do
-					if type(v) == "number" and looksLikeGas(k) then add(inst, "attr", k, v) end
-				end
+	local function scanAttrs(inst)
+		if not inst then return end
+		local ok, attrs = pcall(function() return inst:GetAttributes() end)
+		if not (ok and type(attrs) == "table") then return end
+		for k, v in pairs(attrs) do
+			if looksLikeGas(k) then
+				if type(v) == "number" then add(inst, "attr", k, v)
+				elseif type(v) == "boolean" then add(inst, "flag", k, true) end
 			end
 		end
 	end
 
-	for _, d in ipairs(model:GetDescendants()) do
-		if (d:IsA("NumberValue") or d:IsA("IntValue")) and looksLikeGas(d.Name) then
-			add(d, "value", d.Name, d.Value)
+	local function scanValues(inst)
+		for _, d in ipairs(inst:GetDescendants()) do
+			if (d:IsA("NumberValue") or d:IsA("IntValue")) and looksLikeGas(d.Name) then
+				add(d, "value", d.Name, d.Value)
+			elseif d:IsA("BoolValue") and looksLikeGas(d.Name) then
+				add(d, "bool", d.Name, true)
+			end
 		end
+	end
+
+	scanAttrs(model)
+	scanAttrs(seat)
+	for _, d in ipairs(model:GetDescendants()) do scanAttrs(d) end
+	scanValues(model)
+
+	-- player side: character attributes and anything nitro-shaped in the pack
+	local char = LP.Character
+	scanAttrs(char)
+	if char then scanValues(char) end
+	local pack = LP:FindFirstChildOfClass("Backpack")
+	scanAttrs(pack)
+	for _, t in ipairs(pack and pack:GetChildren() or {}) do
+		scanAttrs(t)
+		for _, d in ipairs(t:GetDescendants()) do scanAttrs(d) end
+		scanValues(t)
 	end
 
 	if #live == 0 then
@@ -113,23 +146,74 @@ end
 
 function CG.apply()
 	for _, f in ipairs(CG.live) do
+		local wrote = false
+
 		if f.kind == "value" then
 			if f.inst.Parent then
 				local v = f.inst.Value
 				if v > f.max then f.max = v end
-				if v < f.max then pcall(function() f.inst.Value = f.max end) end
+				if v < f.max then
+					pcall(function() f.inst.Value = f.max end)
+					wrote = true
+				end
 			end
-		else
+		elseif f.kind == "bool" then
+			if f.inst.Parent and f.inst.Value ~= true then
+				pcall(function() f.inst.Value = true end)
+				wrote = true
+			end
+		elseif f.kind == "attr" then
 			pcall(function()
 				local cur = f.inst:GetAttribute(f.name)
 				if type(cur) == "number" then
 					if cur > f.max then f.max = cur end
-					if cur < f.max then f.inst:SetAttribute(f.name, f.max) end
+					if cur < f.max then
+						f.inst:SetAttribute(f.name, f.max)
+						wrote = true
+					end
 				end
 			end)
+		elseif f.kind == "flag" then
+			if f.inst:GetAttribute(f.name) ~= true then
+				pcall(function() f.inst:SetAttribute(f.name, true) end)
+				wrote = true
+			end
+		end
+
+		-- Did the write stick? A number that reads back below the floor right
+		-- after we set it is being re-replicated, which means the server owns it
+		-- and no amount of local writing will change the car. Four misses is not
+		-- a race condition, it is a mirror - stop lying to the user about it.
+		if wrote and (f.kind == "attr" or f.kind == "value") then
+			local now
+			if f.kind == "value" then
+				now = f.inst.Parent and f.inst.Value or nil
+			else
+				now = f.inst:GetAttribute(f.name)
+			end
+			if type(now) == "number" and now < f.max then
+				f.miss = (f.miss or 0) + 1
+				if f.miss >= 4 and not f.mirrored then
+					f.mirrored = true
+					CG.mirrored += 1
+					notify("Cold gas", tostring(f.name) .. " is server-owned · boost assist is carrying the effect")
+				end
+			else
+				f.miss = 0
+			end
 		end
 	end
 end
+
+-- Boost assist ----------------------------------------------------------------
+-- The fallback that actually moves the car. A client-owned assembly can be given
+-- velocity directly, so this does not care what the game calls its nitro, who
+-- owns the attribute, or whether the bar ever refills: while the car is already
+-- rolling forward, add a bounded amount of speed along its own look vector, up to
+-- a ceiling the user sets. The chassis still does the driving - this only raises
+-- the top speed it is allowed to reach.
+local ASSIST = { on = true, top = 180, accel = 70 }
+TESLA.assist = ASSIST
 
 function CG.set(on)
 	on = on and true or false
@@ -143,14 +227,45 @@ function CG.set(on)
 	end
 	CG.scan()
 	CG.conn = RunService.Heartbeat:Connect(function(dt)
-		-- four writes a second is plenty for a bar that drains over seconds, and
-		-- it keeps a 200-part car out of the per-frame budget
+		-- the assist runs every frame (it is one dot product); the value poller
+		-- runs four times a second, which is plenty for a bar that drains slowly
+		if ASSIST.on then
+			local _, model, root = TESLA.vehicle()
+			if root and model then
+				local look = root.CFrame.LookVector
+				local v = root.AssemblyLinearVelocity
+				local fwd = v:Dot(look)
+				-- never from a standstill and never in reverse: this is extra top
+				-- speed, not a rocket strapped to a parked car
+				if fwd > 8 and fwd < ASSIST.top then
+					local add = math.min(ASSIST.top - fwd, ASSIST.accel * dt)
+					pcall(function() root.AssemblyLinearVelocity = v + look * add end)
+				end
+			end
+		end
+
 		CG.acc += dt
 		if CG.acc < 0.2 then return end
 		CG.acc = 0
 		if #CG.live == 0 or TESLA.seat() ~= CG.seat then CG.scan() end
 		CG.apply()
 	end)
+end
+
+-- What the page shows: how many values we are holding, and whether any of them
+-- turned out to be a mirror the server keeps overwriting.
+function CG.summary()
+	if not CG.on then return "off" end
+	if #CG.live == 0 then return CG.status end
+	local mirrored = 0
+	for _, f in ipairs(CG.live) do
+		if f.mirrored then mirrored = mirrored + 1 end
+	end
+	local head = string.format("%d value%s · %s", #CG.live, #CG.live == 1 and "" or "s", tostring(CG.live[1].name))
+	if mirrored > 0 then
+		return head .. (ASSIST.on and " · server-owned, assist on" or " · server-owned")
+	end
+	return head
 end
 
 ---------------------------------------------------------------- auto-pilot --

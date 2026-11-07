@@ -32,10 +32,23 @@ button(sVeh, "Rescan vehicle", "SCAN", function()
 end)
 
 local sGas = pT.section("Cold gas", 2)
-local gasToggle = toggle(sGas, "Infinite cold gas", false, function(v) CG.set(v) end)
+local gasToggle = toggle(sGas, "Infinite cold gas", false, function(v)
+	CG.set(v)
+	if v and #CG.live == 0 then
+		notify("Cold gas", "no gas value found · boost assist can still do it", "bad")
+	end
+end)
 local gasLabel = label({
 	Text = "off", TextColor3 = T.muted, TextSize = 11, TextWrapped = true,
 	Size = UDim2.new(1, 0, 0, 28), Parent = sGas,
+})
+toggle(sGas, "Boost assist (velocity)", true, function(v) A.Tesla.assist.on = v end)
+slider(sGas, "Assist top speed", 60, 600, 180, function(v) A.Tesla.assist.top = v end)
+label({
+	Text = "A server-owned gas value (NitroMul and friends) is replicated down, so a local write is overwritten and the bar does nothing. "
+		.. "Assist ignores it: while the car is rolling forward it raises the top speed the chassis is allowed to reach.",
+	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+	Size = UDim2.new(1, 0, 0, 44), Parent = sGas,
 })
 button(sGas, "Scan gas values", "SCAN", function()
 	local found = CG.scan()
@@ -150,8 +163,9 @@ task.spawn(function()
 				vehLabel.Text = "Not seated. Sit in the driver's seat to find the car."
 				vehLabel.TextColor3 = T.muted
 			end
-			gasLabel.Text = CG.on and CG.status or "off"
-			gasLabel.TextColor3 = (CG.on and #CG.live > 0) and T.good or T.muted
+			gasLabel.Text = CG.on and CG.summary() or "off"
+			gasLabel.TextColor3 = (CG.on and (CG.mirrored or 0) > 0) and T.warn
+				or ((CG.on and #CG.live > 0) and T.good or T.muted)
 			apLabel.Text = AP.active and AP.status
 				or (AP.picking and "picking · scroll for height · Enter to drive · Esc to cancel")
 				or AP.status
