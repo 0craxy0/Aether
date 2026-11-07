@@ -17,8 +17,11 @@ end
 glassApply()
 
 local glConn = RunService.Heartbeat:Connect(function()
-	local shown = (window.Visible and window.GroupTransparency < 0.95)
-		or (UI.active ~= nil and UI.active.frame.GroupTransparency < 0.95)
+	-- A.loadingDone gates the whole effect: the panel exists (and its ScreenGui is
+	-- disabled) while the loading card is up, and blurring the game behind that
+	-- card is not the look anyone asked for
+	local shown = A.loadingDone and ((window.Visible and window.GroupTransparency < 0.95)
+		or (UI.active ~= nil and UI.active.frame.GroupTransparency < 0.95))
 	local want = (GL.on and shown) and GL.blur or 0
 	GL.fx.Size = GL.fx.Size + (want - GL.fx.Size) * 0.12
 	-- ease, then land: an exponential approach never reaches zero, so turning the

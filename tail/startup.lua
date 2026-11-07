@@ -29,6 +29,10 @@ local function anyVisible()
 end
 
 function A.toggleUI()
+	-- Nothing of the panel is on screen until the loading card has gone; a
+	-- keypress during the load would flip a hide/show nobody can see and leave
+	-- the panel in the wrong state when it finally appears.
+	if not A.loadingDone then return end
 	if UI.busy then
 		-- A config menu is mid-transition. Dropping the press here was the difference
 		-- between "the panel is open" and "the panel can never open again", since this
@@ -174,14 +178,26 @@ A.onCleanup(function() searchConn:Disconnect() end)
 A.selectPage("Character")
 pcall(A.loadConfig)
 
-window.Size = UDim2.fromOffset(A.W * 0.8, A.H * 0.8)
-window.GroupTransparency = 1
-tween(window, 0.8, { Size = UDim2.fromOffset(A.W, A.H), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
+-- The panel exists from stage 3 but its ScreenGui is disabled (core/notify.lua)
+-- until this runs, so the loading card is the only thing on screen while files
+-- are still being built. main.lua calls A.afterLoad once its card has faded;
+-- with no card (the executor refused one) there is nothing to wait for.
+local function show()
+	if not (A.screen and A.screen.Parent) then return end
+	A.loadingDone = true
+	A.screen.Enabled = true
+	window.Size = UDim2.fromOffset(A.W * 0.8, A.H * 0.8)
+	window.GroupTransparency = 1
+	tween(window, 0.8, { Size = UDim2.fromOffset(A.W, A.H), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
 
-local key = bindName("Toggle UI")
-notify("Aether loaded", key and ("press " .. key .. " to hide or show") or "ready", "good")
+	local key = bindName("Toggle UI")
+	notify("Aether loaded", key and ("press " .. key .. " to hide or show") or "ready", "good")
 
--- after the entrance settles, so the question is not competing with the animation
-if A.tts then task.delay(0.7, A.tts.maybePrompt) end
+	-- after the entrance settles, so the question is not competing with the animation
+	if A.tts then task.delay(0.7, A.tts.maybePrompt) end
+end
+A.showUI = show
+
+if A.loading then A.afterLoad = show else show() end
 
 A.stage("9 startup done")

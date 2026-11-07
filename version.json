@@ -1,6 +1,6 @@
 {
-  "rev": 29,
-  "build": "2026-11-07.29",
-  "notes": "New loading screen: a 15-stage progress card that names what is being built (helpers, window, modules, pages, HUD, settings, read-aloud, announcements, keybinds, startup, updater) and shows the build number, then fades into the window. It is built before the first fetch, can never block the load, and reports a failed stage instead of vanishing.",
+  "rev": 30,
+  "build": "2026-11-07.30",
+  "notes": "The panel no longer appears behind the loading card. Its ScreenGui is built but disabled until the card has faded, then the window animates in exactly as before. Announcements and update checks wait for that moment too, so a notice or prompt can never be raised while nobody can see it.",
   "loader": "main.lua"
 }

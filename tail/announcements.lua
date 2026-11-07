@@ -98,6 +98,9 @@ end
 function N.check(force)
 	hydrate()
 	if not N.on or N.busy then return end
+	-- a notice raised before the panel is drawn would fade out unseen behind the
+	-- loading card; the updater loop calls this again once A.loadingDone is set
+	if not A.loadingDone then return end
 	local now = os.clock()
 	if not force and now - N.last < cadence() then return end
 	N.last = now

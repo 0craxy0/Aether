@@ -50,6 +50,11 @@ build number underneath, so a slow executor is visibly slow rather than frozen.
   courtesy, not a dependency.
 - a failed download or syntax error turns the card red with the reason and keeps
   it up for eight seconds instead of leaving a silent half-loaded hub.
+- the panel is built from stage 3 onwards but its ScreenGui stays disabled until
+  the card has finished fading, so nothing of the UI shows behind it. The window
+  then animates in exactly as it always did. Announcements and the update check
+  wait for the same moment, so a toast or a prompt can never be raised while
+  nobody can see it.
 
 The stage log lines (`[Aether] stage ...`) are unchanged, so console output still
 shows exactly the same sequence.

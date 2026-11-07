@@ -11,6 +11,10 @@ if not gui then gui = LP:WaitForChild("PlayerGui") end
 local screen = new("ScreenGui", {
 	Name = "\0Aether", ResetOnSpawn = false,
 	ZIndexBehavior = Enum.ZIndexBehavior.Sibling, IgnoreGuiInset = true, Parent = gui,
+	-- Built while the loader's card is still up (main.lua sets A.loading before
+	-- the first file runs), so the panel is complete but never drawn until the
+	-- card has finished. tail/startup.lua turns it on in its show() step.
+	Enabled = not A.loading,
 })
 A.screen = screen
 

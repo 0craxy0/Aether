@@ -48,9 +48,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-07.29"
+local BUILD = "2026-11-07.30"
 -- monotonic: the updater compares rev, never the date string
-local REV = 29
+local REV = 30
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -209,7 +209,9 @@ do
 
 		-- "ready" is shown for a beat before the card goes, so the last frame the
 		-- user sees is a finished bar rather than the window popping into place.
-		function api.done()
+		-- `after` runs only once the fade is over, which is what gates the hub's
+		-- own ScreenGui (tail/startup.lua sets A.afterLoad while it builds).
+		function api.done(after)
 			if api.dead then return end
 			api.set(TOTAL, "ready")
 			task.delay(0.5, function()
@@ -221,6 +223,10 @@ do
 					tw.Completed:Wait()
 				end)
 				if sg.Parent then sg:Destroy() end
+				if after then
+					local okAfter, errAfter = pcall(after)
+					if not okAfter then warn("[Aether] could not show the panel: " .. tostring(errAfter)) end
+				end
 			end)
 		end
 
@@ -290,5 +296,6 @@ end
 
 -- The loop ending is the completion signal. Waiting for the last stage would
 -- leave the bar one short forever on a non-owner client, where tail/admin.lua
--- returns before it can announce itself.
-if loading then pcall(loading.done) end
+-- returns before it can announce itself. A.afterLoad is tail/startup.lua's
+-- reveal, so the panel's first frame happens after this card is gone.
+if loading then pcall(loading.done, A.afterLoad) end

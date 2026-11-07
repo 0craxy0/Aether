@@ -278,6 +278,11 @@ end)
 task.spawn(function()
 	while running do
 		task.wait(1)
+		-- Nothing may open a dialog before the panel is on screen (tail/startup
+		-- sets A.loadingDone after the loader's card fades): U.dialog would be
+		-- occupied by a card nobody can see or dismiss, and every later prompt
+		-- would be refused as "already open".
+		if not A.loadingDone then continue end
 		-- self-throttled to its own interval; rides this loop instead of a second one
 		if running and A.announce then A.announce.check() end
 		if running and U.enabled then
