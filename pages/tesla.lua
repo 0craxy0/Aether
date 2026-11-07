@@ -131,7 +131,89 @@ function rebuildAttrs() -- luacheck: ignore
 	end
 end
 
-local sGas = pT.section("Cold gas", 3)
+-- --------------------------------------------------------------- coins --
+-- The stunt coin number from the HUD. The module finds where the game keeps it
+-- (leaderstats, a folder, or a player attribute) and writes it; the box shows the
+-- real value, not a placeholder, and the line above says where it came from.
+local sCoin = pT.section("Stunt coins", 3)
+local coinWhere = label({
+	Text = "looking for the coin value…", TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+	Size = UDim2.new(1, 0, 0, 26), Parent = sCoin,
+})
+
+local coinRow = rowBase(sCoin, 40)
+label({
+	Text = "Stunt coins", Font = FONT.med, TextSize = 12,
+	Position = UDim2.fromOffset(11, 4), Size = UDim2.new(1, -152, 0, 16), Parent = coinRow,
+})
+local coinSub = label({
+	Text = "current value", TextColor3 = T.muted, TextSize = 9,
+	Position = UDim2.fromOffset(11, 21), Size = UDim2.new(1, -152, 0, 13),
+	TextTruncate = Enum.TextTruncate.AtEnd, Parent = coinRow,
+})
+
+local coinBox = new("TextBox", {
+	Name = "coins", Text = "", PlaceholderText = "",
+	ClearTextOnFocus = false, Font = FONT.med, TextSize = 11, TextColor3 = T.text,
+	BackgroundColor3 = T.bg, BorderSizePixel = 0,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -74, 0.5, 0),
+	Size = UDim2.fromOffset(62, 24), Parent = coinRow,
+}, {
+	new("UICorner", { CornerRadius = UDim.new(0, 5) }),
+	new("UIStroke", { Color = T.stroke, Transparency = 0.45, Thickness = 1 }),
+})
+
+local function syncCoins(force)
+	if force and not TESLA.coins.entry then TESLA.coins.find() end
+	local e = TESLA.coins.entry
+	local v = TESLA.coins.read(e)
+	if type(v) == "number" then
+		e.value = v
+		coinSub.Text = "current · " .. tostring(math.floor(v))
+		coinWhere.Text = "from " .. TESLA.coins.where(e) .. " · client-side, the server may reset it"
+		if UserInputService:GetFocusedTextBox() ~= coinBox then
+			local txt = tostring(math.floor(v))
+			if coinBox.Text ~= txt then coinBox.Text = txt end
+		end
+	else
+		coinSub.Text = "not found"
+		coinWhere.Text = "No coin value on this player yet. Press SCAN while the coin HUD is on screen."
+	end
+end
+
+local function applyCoins()
+	local want = coinBox.Text
+	local ok, why = TESLA.coins.set(want)
+	if ok then
+		notify("Stunt coins", "set to " .. tostring(math.floor(tonumber(want) or 0)), "good")
+	else
+		notify("Stunt coins", tostring(why), "bad")
+	end
+	syncCoins()
+end
+
+coinBox.FocusLost:Connect(function(enter) if enter then applyCoins() end end)
+
+local coinSet = new("TextButton", {
+	Text = "Set", Font = FONT.med, TextSize = 10, TextColor3 = T.text,
+	BackgroundColor3 = T.accent, AutoButtonColor = false, BorderSizePixel = 0,
+	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0),
+	Size = UDim2.fromOffset(56, 24), Parent = coinRow,
+}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
+coinSet.MouseEnter:Connect(function() tween(coinSet, 0.12, { BackgroundColor3 = T.good }) end)
+coinSet.MouseLeave:Connect(function() tween(coinSet, 0.12, { BackgroundColor3 = T.accent }) end)
+coinSet.MouseButton1Click:Connect(function() sfx("tap"); applyCoins() end)
+
+button(sCoin, "Find the coin value", "SCAN", function()
+	local e = TESLA.coins.find()
+	syncCoins(true)
+	notify("Stunt coins", e and ("found " .. TESLA.coins.where(e)) or "no coin value on this player", e and "good" or "bad")
+end)
+
+syncCoins(true)
+
+local sGas = pT.section("Cold gas", 4)
 local gasToggle = toggle(sGas, "Infinite cold gas", false, function(v)
 	CG.set(v)
 	if v and #CG.live == 0 then
@@ -173,7 +255,7 @@ end)
 -- ------------------------------------------------------------- auto-pilot --
 local rebuildSpots -- forward: the save button refreshes the list below
 
-local sAP = pT.section("Auto-pilot", 4)
+local sAP = pT.section("Auto-pilot", 5)
 local pickToggle = toggle(sAP, "Middle-click to pick destination", false, function(v)
 	AP.enabled = v
 	if v then notify("Auto-pilot", "middle-click a spot on the map, scroll for height", "good") end
@@ -209,7 +291,7 @@ button(sAP, "Save destination", "SAVE", function()
 end)
 
 -- ---------------------------------------------------------- saved spots ---
-local sSpots = pT.section("Saved spots", 5)
+local sSpots = pT.section("Saved spots", 6)
 local spotHolder = new("Frame", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1, Parent = sSpots,
@@ -282,6 +364,7 @@ task.spawn(function()
 					end
 				end
 			end
+			syncCoins()
 			local seat, model = TESLA.vehicle()
 			if model then
 				vehLabel.Text = string.format("%s · %s%s", model.Name, seat.Name,

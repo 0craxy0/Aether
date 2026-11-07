@@ -1,6 +1,6 @@
 {
-  "rev": 38,
-  "build": "2026-11-07.38",
-  "notes": "Fixes the camera sticking to one spot when Drive is pressed. The destination picker used to replace workspace.CurrentCamera with its own scriptable Camera; when the game's camera module destroys the camera it did not create, there was nothing left to restore, so the view stayed at the preview position for the rest of the session. The picker no longer touches the camera at all - the destination is marked with a tag and a beam from the ground up to it - so the game's chase camera keeps following the car through Drive. A restore path remains as a safety net for anyone whose session already lost the camera.",
+  "rev": 39,
+  "build": "2026-11-07.39",
+  "notes": "Adds a Stunt coins section to the Tesla page. The coin counter is found the same way the car attributes are - it scans the player's leaderstats, any one-level folder on the player, and the player's attributes - and prefers a name that says stunt or coin over a generic money/cash one. The section names where the value came from, puts the current value in an editable box (Text, not placeholder, with a Set button and Enter), and reports honestly that it is a client-side write which the server may revert. A SCAN button re-finds the value if the HUD is created later.",
   "loader": "main.lua"
 }

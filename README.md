@@ -68,6 +68,12 @@ The Tesla page is two tools and a marker:
   It is off by default and never restored by config, because writing velocity on a
   server-simulated car costs a replication round trip per tick - it runs at 15 Hz,
   only for the driver, and disables itself within 3s if the speed does not rise.
+- **Stunt coins** - the HUD number. It is not an attribute of the car, so it is
+  found the same way those are: leaderstats, a folder on the player, or a player
+  attribute whose name looks like a coin counter. The line above the row says
+  which one it found, the box holds the real value, and `Set` (or Enter) writes it
+  and reads it back. It is a client-side write: the HUD follows it, and the server
+  may put its own number back afterwards.
 - **Auto-pilot** - middle-click the spot you want on the map. The destination is
   marked in the world - a tag on the point and a beam from the ground up to it -
   and the scroll wheel raises it (`Destination height` in the page follows the

@@ -796,6 +796,124 @@ function ATTR.map()
 	return out
 end
 
+---------------------------------------------------------------- coins --
+
+-- Stunt coins: the number in the corner of the HUD. Where it actually lives
+-- differs per game - a leaderstats IntValue, a Player attribute, sometimes a
+-- NumberValue named something like StuntCoins - so find it the same way the
+-- attributes are found, then write it and read it back. If the game re-sends the
+-- old number, the client copy is not the real one and the page says so instead of
+-- showing a number that is only true in this window.
+local COINS = { entry = nil, base = nil, tried = 0 }
+TESLA.coins = COINS
+
+local COIN_WORDS = { "stuntcoin", "stunt", "coin", "credits", "cash", "money" }
+
+local function coinRank(name)
+	local n = flat(name)
+	if n:find("stunt", 1, true) then return 0 end
+	if n:find("coin", 1, true) then return 1 end
+	for _, w in ipairs(COIN_WORDS) do
+		if n:find(w, 1, true) then return 2 end
+	end
+	return nil
+end
+
+function COINS.read(e)
+	e = e or COINS.entry
+	if not e then return nil end
+	if e.kind == "value" then
+		local ok, v = pcall(function() return e.inst.Value end)
+		return ok and v or nil
+	end
+	local ok, v = pcall(e.inst.GetAttribute, e.inst, e.name)
+	return ok and v or nil
+end
+
+function COINS.where(e)
+	e = e or COINS.entry
+	if not e then return "not found" end
+	if e.kind == "attr" then return tostring(e.name) .. " · attribute" end
+	local path = e.name
+	local parent = e.inst.Parent
+	if parent and parent ~= LP then
+		if parent.Parent == LP then path = parent.Name .. "." .. e.name
+		elseif parent.Parent and parent.Parent.Parent == LP then path = parent.Parent.Name .. "." .. parent.Name .. "." .. e.name end
+	end
+	return path .. " · value"
+end
+
+-- candidates: leaderstats (and anything else one folder deep on the player),
+-- then the player's own attributes. A nested walk is not worth it here - a coin
+-- counter that a client script can see is almost always one of those two.
+function COINS.find()
+	local best, bestRank = nil, nil
+
+	local function consider(inst, kind, name)
+		local rank = coinRank(name)
+		if not rank then return end
+		local v
+		if kind == "value" then
+			local ok, got = pcall(function() return inst.Value end)
+			v = ok and got or nil
+		else
+			local ok, got = pcall(inst.GetAttribute, inst, name)
+			v = ok and got or nil
+		end
+		if type(v) ~= "number" then return end
+		if not best or rank < bestRank then
+			best, bestRank = { inst = inst, kind = kind, name = name, value = v }, rank
+		end
+	end
+
+	local okA, attrs = pcall(LP.GetAttributes, LP)
+	if okA and type(attrs) == "table" then
+		for k in pairs(attrs) do consider(LP, "attr", k) end
+	end
+	for _, child in ipairs(LP:GetChildren()) do
+		if child:IsA("NumberValue") or child:IsA("IntValue") then
+			consider(child, "value", child.Name)
+		elseif child:IsA("Folder") or child:IsA("Configuration") then
+			for _, sub in ipairs(child:GetChildren()) do
+				if sub:IsA("NumberValue") or sub:IsA("IntValue") then
+					consider(sub, "value", sub.Name)
+				end
+			end
+		end
+	end
+
+	COINS.entry = best
+	COINS.base = best and best.value or nil
+	COINS.tried = os.clock()
+	return best
+end
+
+function COINS.set(n)
+	if not COINS.entry then COINS.find() end
+	local e = COINS.entry
+	if not e then return false, "no coin value found on this player" end
+	local v = math.floor(tonumber(n) or -1)
+	if v < 0 then return false, "not a number" end
+	local ok
+	if e.kind == "value" then
+		ok = pcall(function() e.inst.Value = v end)
+	else
+		ok = pcall(e.inst.SetAttribute, e.inst, e.name, v)
+	end
+	local now = COINS.read(e)
+	if type(now) == "number" then e.value = now end
+	if not ok then return false, "the game refused the write" end
+	if type(now) == "number" and now ~= v then
+		return false, "server-owned · reads back as " .. tostring(math.floor(now))
+	end
+	return true
+end
+
+function COINS.reset()
+	if COINS.base == nil then return false, "nothing mapped yet" end
+	return COINS.set(COINS.base)
+end
+
 ------------------------------------------------------------------ input --
 
 -- Middle click is the picker. It only fires while the toggle is on, so the same
