@@ -297,3 +297,25 @@ Aether/
     ├── admin.lua             owner panel (one account, local check only)
     └── startup.lua           show/hide, search, startup animation
 ```
+
+## internet tycoon
+
+Place `10767564282`. Its own shelf, so the tab only appears in that game - the
+loader decides the shelf from the place id before it fetches anything, and this
+one is `tycoon`.
+
+- **Money** - the balance is a leaderstats value, a value in a folder on the
+  player, or a player attribute; the page scans for the most money-shaped one
+  (`Cash`, `Money`, `Dollars`, `Funds`, ...) and says which it took. The box holds
+  the real number, `Set`/Enter writes it, and `Keep it there` re-applies it every
+  0.35s - which is the only part of a server-reconciled balance a client can hold.
+- **Thunderstorms** - the storm that eats cables and towers is game state, so the
+  page finds the switches (weather/storm/thunder/rain values and attributes it can
+  see on `Lighting`, the player, `workspace` and `ReplicatedStorage`), pins them to
+  calm once a second while it is on, and switches off lightning and thunder effects
+  that are already running - `Enabled = false`, saved and restored, never deleted.
+  A storm the server has already run is not undone by this: the damage is the
+  server's, the sky in front of you is the client's.
+
+Both features are honest about the line they cannot cross: a client write reports
+what it read back, and "server-owned" means exactly that.

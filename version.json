@@ -1,6 +1,6 @@
 {
-  "rev": 39,
-  "build": "2026-11-07.39",
-  "notes": "Adds a Stunt coins section to the Tesla page. The coin counter is found the same way the car attributes are - it scans the player's leaderstats, any one-level folder on the player, and the player's attributes - and prefers a name that says stunt or coin over a generic money/cash one. The section names where the value came from, puts the current value in an editable box (Text, not placeholder, with a Set button and Enter), and reports honestly that it is a client-side write which the server may revert. A SCAN button re-finds the value if the HUD is created later.",
+  "rev": 40,
+  "build": "2026-11-07.40",
+  "notes": "Adds Internet Tycoon (place 10767564282) as its own shelf: modules/tycoon.lua and pages/tycoon.lua, wired into the loader's place table, the forced-profile allowlist and the Games list. Two features. Money finds the balance where a tycoon keeps it (leaderstats, a folder on the player, a player attribute), puts the real value in an editable box, writes it, reads it back, and can keep re-applying it every 0.35s - the only part of a server-reconciled number a client can hold. Thunderstorms find every weather/storm/thunder/rain value or attribute visible on Lighting, the player, workspace and ReplicatedStorage, pin them to calm once a second while on, and switch off running lightning and thunder effects (Enabled = false, saved and restored, never deleted).",
   "loader": "main.lua"
 }

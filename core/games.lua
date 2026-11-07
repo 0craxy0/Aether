@@ -24,6 +24,10 @@ local LIST = {
 		blurb = "Open world update: infinite cold gas and auto-pilot with a height-picking camera.",
 	},
 	{
+		key = "tycoon", name = "Internet Tycoon", place = (A.placeIds or {}).tycoon,
+		blurb = "Build a town of towers and hubs: money controls, and a sky that stops trying to eat the cables.",
+	},
+	{
 		key = "universal", name = "Universal", place = nil,
 		blurb = "The generic shelf - character, ESP, movement, actions - plus the detected game's own modules, if it has any.",
 	},

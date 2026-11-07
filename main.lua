@@ -31,12 +31,14 @@ local FILES = {
 	{ "modules/killaura.lua", "arsenal" },
 	{ "modules/projectile.lua", "arsenal" },
 	{ "modules/tesla.lua", "tesla" },
+	{ "modules/tycoon.lua", "tycoon" },
 	{ "core/pagekit.lua" },
 	{ "pages/character.lua" },
 	{ "pages/movement.lua" },
 	{ "pages/visuals.lua" },
 	{ "pages/combat.lua", "arsenal" },
 	{ "pages/tesla.lua", "tesla" },
+	{ "pages/tycoon.lua", "tycoon" },
 	{ "pages/players.lua" },
 	{ "tail/keylist.lua" }, -- before pages/ui (it creates A.kbList)
 	{ "pages/ui.lua" }, -- creates A.sUI4 for the files below
@@ -55,9 +57,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-07.39"
+local BUILD = "2026-11-07.40"
 -- monotonic: the updater compares rev, never the date string
-local REV = 39
+local REV = 40
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -76,11 +78,12 @@ local A = { base = BASE, build = BUILD, rev = REV }
 --
 -- The place ids live here, once: the loader is the only thing that can use them
 -- before the first file exists, so it owns them and publishes them for the rest.
-local PLACE_IDS = { arsenal = 286090429, tesla = 1794074302239 }
+local PLACE_IDS = { arsenal = 286090429, tesla = 1794074302239, tycoon = 10767564282 }
 
 local function detectProfile(place)
 	if place == PLACE_IDS.arsenal then return "arsenal" end
 	if place == PLACE_IDS.tesla then return "tesla" end
+	if place == PLACE_IDS.tycoon then return "tycoon" end
 	return "universal"
 end
 
@@ -95,7 +98,7 @@ A.place = game.PlaceId
 local forced = getgenv and getgenv().AetherGame
 local forcedFor = getgenv and getgenv().AetherGameFor
 local key
-if (forced == "arsenal" or forced == "tesla" or forced == "universal") and forcedFor == A.place then
+if (forced == "arsenal" or forced == "tesla" or forced == "tycoon" or forced == "universal") and forcedFor == A.place then
 	key = forced
 else
 	if forced and getgenv then
