@@ -5,6 +5,7 @@ local A = ...
 if not A.Tesla then return end
 local makePage, toggle, slider, dropdown, button = A.makePage, A.toggle, A.slider, A.dropdown, A.button
 local label, new, rowBase = A.label, A.new, A.rowBase
+local UserInputService, sfx, tween = A.UserInputService, A.sfx, A.tween
 local T, FONT, notify = A.T, A.FONT, A.notify
 
 local TESLA = A.Tesla
@@ -31,7 +32,106 @@ button(sVeh, "Rescan vehicle", "SCAN", function()
 	notify("Vehicle", model.Name .. " · " .. (seat.Name or "seat"), "good")
 end)
 
-local sGas = pT.section("Cold gas", 2)
+-- ----------------------------------------------------------- attributes --
+-- Every number the car keeps that decides how it moves: top speed, acceleration,
+-- gravity, grip, boost. The module finds them and renames them; this section is
+-- one row each - the friendly name, what it really is, the value it had when it
+-- was mapped in the box, and a reset back to that value.
+local sAttr = pT.section("Car attributes", 2)
+local attrHint = label({
+	Text = "Sit in the car and press MAP. Values are the car's own at mapping time. Type a number and press Enter, or click away.",
+	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+	Size = UDim2.new(1, 0, 0, 28), Parent = sAttr,
+})
+button(sAttr, "Map car attributes", "MAP", function()
+	local found = TESLA.attrs.map()
+	rebuildAttrs()
+	if #found == 0 then
+		notify("Attributes", "nothing mapped · sit in the driver's seat first", "bad")
+	else
+		notify("Attributes", string.format("%d value%s mapped", #found, #found == 1 and "" or "s"), "good")
+	end
+end)
+
+local attrHolder = new("Frame", {
+	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundTransparency = 1, Parent = sAttr,
+}, { new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }) })
+
+local function attrKindText(e)
+	if e.kind == "gravity" then return "workspace.Gravity" end
+	return tostring(e.name) .. " · " .. (e.kind == "attr" and "attribute" or "value")
+end
+
+function rebuildAttrs() -- luacheck: ignore
+	for _, c in ipairs(attrHolder:GetChildren()) do
+		if not c:IsA("UIListLayout") then c:Destroy() end
+	end
+	local list = TESLA.attrs.list
+	if #list == 0 then
+		label({
+			Text = "Nothing mapped yet. Sit in the driver's seat, then MAP.",
+			TextColor3 = T.muted, TextSize = 11, TextWrapped = true,
+			Size = UDim2.new(1, 0, 0, 26), Parent = attrHolder,
+		})
+		return
+	end
+	for i, e in ipairs(list) do
+		local row = rowBase(attrHolder, 40)
+		row.LayoutOrder = i
+		label({
+			Text = e.label, Font = FONT.med, TextSize = 12,
+			Position = UDim2.fromOffset(11, 4), Size = UDim2.new(1, -152, 0, 16), Parent = row,
+		})
+		label({
+			Text = attrKindText(e), TextColor3 = T.muted, TextSize = 9,
+			Position = UDim2.fromOffset(11, 21), Size = UDim2.new(1, -152, 0, 13),
+			TextTruncate = Enum.TextTruncate.AtEnd, Parent = row,
+		})
+
+		-- the value goes in Text, never the placeholder: a hint that disappears the
+		-- moment you type is not the value you are editing
+		local box = new("TextBox", {
+			Name = "value", Text = TESLA.attrs.fmt(e.value), PlaceholderText = "",
+			ClearTextOnFocus = false, Font = FONT.med, TextSize = 11, TextColor3 = T.text,
+			BackgroundColor3 = T.bg, BorderSizePixel = 0,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -74, 0.5, 0),
+			Size = UDim2.fromOffset(62, 24), Parent = row,
+		}, {
+			new("UICorner", { CornerRadius = UDim.new(0, 5) }),
+			new("UIStroke", { Color = T.stroke, Transparency = 0.45, Thickness = 1 }),
+		})
+		e.box = box
+
+		box.FocusLost:Connect(function()
+			local ok, why = TESLA.attrs.set(e, box.Text)
+			box.Text = TESLA.attrs.fmt(TESLA.attrs.read(e))
+			if ok then
+				notify(e.label, "set to " .. box.Text, "good")
+			else
+				notify(e.label, tostring(why), "bad")
+			end
+		end)
+
+		local reset = new("TextButton", {
+			Text = "Reset", Font = FONT.med, TextSize = 10, TextColor3 = T.muted,
+			BackgroundColor3 = T.stroke, AutoButtonColor = false, BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -8, 0.5, 0),
+			Size = UDim2.fromOffset(56, 24), Parent = row,
+		}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
+		reset.MouseEnter:Connect(function() tween(reset, 0.12, { BackgroundColor3 = T.accent, TextColor3 = T.text }) end)
+		reset.MouseLeave:Connect(function() tween(reset, 0.12, { BackgroundColor3 = T.stroke, TextColor3 = T.muted }) end)
+		reset.MouseButton1Click:Connect(function()
+			sfx("tap")
+			local ok, why = TESLA.attrs.reset(e)
+			box.Text = TESLA.attrs.fmt(TESLA.attrs.read(e))
+			notify(e.label, ok and ("reset to " .. box.Text) or tostring(why), ok and "good" or "bad")
+		end)
+	end
+end
+
+local sGas = pT.section("Cold gas", 3)
 local gasToggle = toggle(sGas, "Infinite cold gas", false, function(v)
 	CG.set(v)
 	if v and #CG.live == 0 then
@@ -73,7 +173,7 @@ end)
 -- ------------------------------------------------------------- auto-pilot --
 local rebuildSpots -- forward: the save button refreshes the list below
 
-local sAP = pT.section("Auto-pilot", 3)
+local sAP = pT.section("Auto-pilot", 4)
 local pickToggle = toggle(sAP, "Middle-click to pick destination", false, function(v)
 	AP.enabled = v
 	if v then notify("Auto-pilot", "middle-click a spot on the map, scroll for height", "good") end
@@ -109,7 +209,7 @@ button(sAP, "Save destination", "SAVE", function()
 end)
 
 -- ---------------------------------------------------------- saved spots ---
-local sSpots = pT.section("Saved spots", 4)
+local sSpots = pT.section("Saved spots", 5)
 local spotHolder = new("Frame", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1, Parent = sSpots,
@@ -155,14 +255,33 @@ button(sSpots, "Clear saved spots", "CLEAR", function()
 end)
 rebuildSpots()
 
-A.onPage(function(name) if name == "Tesla" then rebuildSpots() end end)
+A.onPage(function(name)
+	if name ~= "Tesla" then return end
+	rebuildSpots()
+	if #TESLA.attrs.list == 0 then TESLA.attrs.map() end
+	rebuildAttrs()
+end)
 
--- one quiet loop keeps the three readouts honest without a connection per label
+-- one quiet loop keeps the readouts (and the attribute boxes) honest without a
+-- connection per label. A box being typed in is left alone - the game can rewrite
+-- an attribute under us, but it must not rewrite the half-typed number in the field
 local running = true
 task.spawn(function()
 	while running do
 		task.wait(0.4)
 		if pT.scroll and pT.scroll.Visible then
+			local focused = UserInputService:GetFocusedTextBox()
+			for _, e in ipairs(TESLA.attrs.list) do
+				local b = e.box
+				if b and b.Parent and b ~= focused then
+					local now = TESLA.attrs.read(e)
+					if type(now) == "number" then
+						local txt = TESLA.attrs.fmt(now)
+						if b.Text ~= txt then b.Text = txt end
+						e.value = now
+					end
+				end
+			end
 			local seat, model = TESLA.vehicle()
 			if model then
 				vehLabel.Text = string.format("%s · %s%s", model.Name, seat.Name,

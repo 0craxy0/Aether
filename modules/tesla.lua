@@ -596,6 +596,182 @@ end
 
 onCleanup(function() teardownPreview() end)
 
+----------------------------------------------------------- attribute map --
+
+-- The numbers that actually drive the car. A gas poller cannot raise a top speed
+-- that lives in an attribute, because the speed is computed from that number - so
+-- the attribute is the thing to hand the user. They are all named for a
+-- programmer (TopSpeed, NitroMul, MaxThrust), which is why this section exists:
+-- find them, rename them into English, keep the value they had when it was found,
+-- and let the page put a box and a reset next to each one.
+local ATTR = { list = {}, mappedAt = 0 }
+TESLA.attrs = ATTR
+
+local function flat(name)
+	return tostring(name):lower():gsub("[%s_%-%./:]", "")
+end
+
+function ATTR.fmt(v)
+	if type(v) ~= "number" then return tostring(v) end
+	if v == math.floor(v) and math.abs(v) < 1e15 then return string.format("%d", v) end
+	return string.format("%.4g", v)
+end
+
+-- keyword -> label. Specific before generic: "maxspeed" has to win over "speed".
+local NAME_WORDS = {
+	{ "maxspeed", "Max speed" }, { "topspeed", "Top speed" }, { "vmax", "Max speed" },
+	{ "maxvelocity", "Max velocity" }, { "speed", "Speed" }, { "velocity", "Velocity" },
+	{ "acceleration", "Acceleration" }, { "accel", "Acceleration" },
+	{ "thrust", "Thrust" }, { "torque", "Torque" }, { "engine", "Engine power" },
+	{ "power", "Power" }, { "force", "Force" },
+	{ "gravity", "Gravity" }, { "grav", "Gravity" }, { "weight", "Weight" },
+	{ "mass", "Mass" }, { "density", "Density" },
+	{ "nitromul", "Nitro multiplier" }, { "nitro", "Nitro" }, { "turbo", "Turbo" },
+	{ "boost", "Boost" }, { "overdrive", "Overdrive" }, { "nos", "NOS" },
+	{ "steering", "Steering" }, { "steer", "Steering" }, { "handling", "Handling" },
+	{ "turn", "Turning" }, { "friction", "Friction" }, { "grip", "Grip" },
+	{ "drag", "Drag" }, { "damping", "Damping" }, { "suspension", "Suspension" },
+	{ "spring", "Spring" }, { "downforce", "Downforce" }, { "lift", "Lift" },
+	{ "jump", "Jump power" }, { "hover", "Hover" }, { "fly", "Fly" },
+	{ "coldgas", "Cold gas" }, { "gas", "Gas" }, { "fuel", "Fuel" },
+	{ "charge", "Charge" }, { "energy", "Energy" }, { "battery", "Battery" },
+	{ "health", "Health" },
+}
+
+-- which shelf a number belongs on, and in what order the rows appear
+local GROUPS = {
+	{ id = "speed", rank = 1, words = { "speed", "vmax", "velocity", "vel", "spd" } },
+	{ id = "accel", rank = 2, words = { "accel", "thrust", "torque", "power", "force", "engine" } },
+	{ id = "physics", rank = 3, words = { "gravity", "grav", "mass", "weight", "density", "downforce", "lift" } },
+	{ id = "steer", rank = 4, words = { "steer", "turn", "handling" } },
+	{ id = "grip", rank = 5, words = { "friction", "grip", "drag", "damping", "suspension", "spring" } },
+	{ id = "boost", rank = 6, words = { "boost", "nitro", "turbo", "nos", "overdrive" } },
+	{ id = "fuel", rank = 7, words = { "gas", "fuel", "charge", "energy", "battery" } },
+}
+
+-- a name nothing matched is still shown, just last: the car found something, and
+-- hiding it because we did not recognise the word is the worse mistake
+local RANK_OTHER = 9
+
+local function groupOf(name)
+	local n = flat(name)
+	for _, g in ipairs(GROUPS) do
+		for _, w in ipairs(g.words) do
+			if n:find(w, 1, true) then return g.id, g.rank end
+		end
+	end
+	return "other", RANK_OTHER
+end
+
+function ATTR.label(name)
+	local n = flat(name)
+	for _, pair in ipairs(NAME_WORDS) do
+		if n:find(pair[1], 1, true) then return pair[2] end
+	end
+	-- CamelCase -> "Camel case", the generic fallback
+	local words = tostring(name):gsub("(%l)(%u)", "%1 %2"):gsub("_", " "):gsub("%s+", " ")
+	words = words:gsub("^%l", string.upper)
+	return words
+end
+
+function ATTR.read(e)
+	if e.kind == "attr" then
+		local ok, v = pcall(e.inst.GetAttribute, e.inst, e.name)
+		return ok and v or nil
+	elseif e.kind == "value" then
+		local ok, v = pcall(function() return e.inst.Value end)
+		return ok and v or nil
+	elseif e.kind == "gravity" then
+		return workspace.Gravity
+	end
+end
+
+-- Write, then read back. A number the server keeps re-sending downward is not
+-- ours to hold, and saying so beats a box that silently snaps back.
+function ATTR.set(e, value)
+	local v = tonumber(value)
+	if not v then return false, "not a number" end
+	local ok
+	if e.kind == "attr" then
+		ok = pcall(e.inst.SetAttribute, e.inst, e.name, v)
+	elseif e.kind == "value" then
+		ok = pcall(function() e.inst.Value = v end)
+	elseif e.kind == "gravity" then
+		ok = pcall(function() workspace.Gravity = v end)
+	else
+		return false, "this one cannot be written"
+	end
+	local now = ATTR.read(e)
+	if type(now) == "number" then e.value = now end
+	if not ok then return false, "the game refused the write" end
+	if type(now) == "number" and math.abs(now - v) > 1e-4 then
+		return false, "server-owned · reads back as " .. ATTR.fmt(now)
+	end
+	return true
+end
+
+function ATTR.reset(e)
+	return ATTR.set(e, e.base)
+end
+
+-- One walk, same budget rule as the gas scan: a car built like a map does not get
+-- walked forever. Attributes first on the model and the seat, then every
+-- descendant that carries one, then NumberValue/IntValue children.
+function ATTR.map()
+	local out, seen = {}, {}
+
+	local function push(inst, kind, name, value, scope)
+		if type(value) ~= "number" then return end
+		local id = tostring(scope) .. "|" .. tostring(name) .. "|" .. kind
+		if seen[id] then return end
+		seen[id] = true
+		local group, rank = groupOf(name)
+		out[#out + 1] = {
+			inst = inst, kind = kind, name = name, scope = scope,
+			value = value, base = value, group = group, rank = rank,
+			label = ATTR.label(name),
+		}
+	end
+
+	local function attrs(inst, scope)
+		if not inst then return end
+		local ok, a = pcall(inst.GetAttributes, inst)
+		if not (ok and type(a) == "table") then return end
+		for k, v in pairs(a) do
+			if type(v) == "number" then push(inst, "attr", k, v, scope) end
+		end
+	end
+
+	local seat, model = TESLA.vehicle()
+	if model then
+		attrs(model, "car")
+		attrs(seat, "seat")
+		local budget = 600
+		for _, d in ipairs(model:GetDescendants()) do
+			budget -= 1
+			if budget <= 0 then break end
+			attrs(d, "car")
+			if d:IsA("NumberValue") or d:IsA("IntValue") then
+				push(d, "value", d.Name, d.Value, "car")
+			end
+		end
+		attrs(LP.Character, "player")
+	end
+	-- the world number a flying car is most likely fighting
+	push(workspace, "gravity", "Gravity", workspace.Gravity, "world")
+
+	table.sort(out, function(a, b)
+		if a.rank ~= b.rank then return a.rank < b.rank end
+		if a.label ~= b.label then return a.label < b.label end
+		return tostring(a.name) < tostring(b.name)
+	end)
+	while #out > 24 do table.remove(out) end
+
+	ATTR.list = out
+	ATTR.mappedAt = os.clock()
+	return out
+end
+
 ------------------------------------------------------------------ input --
 
 -- Middle click is the picker. It only fires while the toggle is on, so the same

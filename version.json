@@ -1,6 +1,6 @@
 {
-  "rev": 36,
-  "build": "2026-11-07.36",
-  "notes": "Fixes the intermittent freeze at load. It was not the modules - it was the loader waiting on a network request that never answered, which looks identical to a dead game because the card stops mid-load. Every file is now fetched on its own thread with a deadline (8s, one 15s retry), a slow file is named on the card instead of freezing silently, the whole load gives up cleanly after 90s, and a file that still cannot be fetched falls back to the copy this build wrote to Aether/cache/<rev>/ on the last successful load. A fallback can never serve another build's code: the cache path carries the rev.",
+  "rev": 37,
+  "build": "2026-11-07.37",
+  "notes": "Maps the car's own numbers: Tesla page gains a Car attributes section that finds every numeric attribute and NumberValue on the vehicle that decides how it moves - max speed, top speed, acceleration, thrust, torque, gravity, mass, grip, friction, drag, boost, nitro - and shows it under a readable name (Max speed, Gravity, Nitro multiplier) with the mapped value in an editable box and a Reset next to it. Values live in Text, never a placeholder. Every write is read back: a number the server keeps re-sending is reported as server-owned instead of silently snapping. workspace.Gravity is included for the flying car.",
   "loader": "main.lua"
 }
