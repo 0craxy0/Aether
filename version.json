@@ -1,6 +1,6 @@
 {
-  "rev": 41,
-  "build": "2026-11-07.41",
-  "notes": "The Internet Tycoon money scan no longer gives up when the balance is not named obviously. It now sweeps the player three levels deep, the character, workspace three levels deep (where a plot model usually lives) and ReplicatedStorage two levels deep, on a 4000-node budget, collecting every numeric value and attribute. Money-named hits are ranked and auto-bound; everything else it saw is listed in the page with a USE button, so a balance the game called Total or Value can be picked by hand and behaves exactly like an auto-detected one afterwards.",
+  "rev": 42,
+  "build": "2026-11-07.42",
+  "notes": "Internet Tycoon support is removed entirely: the shelf record, the place id, the detect and forced-profile entries, the loader file list entries, modules/tycoon.lua, pages/tycoon.lua and its README section. The hub is back to the shelves that work: Arsenal, Tesla and Universal.",
   "loader": "main.lua"
 }

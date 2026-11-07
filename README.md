@@ -1,4 +1,4 @@
-# aether, the actual best script  on roblox, called "aether"
+﻿# aether, the actual best script  on roblox, called "aether"
 ## contents
 - uhh basically just a really good script
 - ton of features
@@ -95,7 +95,7 @@ on a slope). Both live in `modules/tesla.lua`'s drive step.
 ## loading
 
 `main.lua` draws a small centred card before it fetches the first file, then
-repaints it from `A.stage`. It reads `7 / 15 loaded · keybind overlay` with the
+repaints it from `A.stage`. It reads `7 / 15 loaded Â· keybind overlay` with the
 build number underneath, so a slow executor is visibly slow rather than frozen.
 
 - the 15 stages are declared in one `PLAN` table in `main.lua`, in the order they
@@ -249,73 +249,51 @@ trusts. `A.updater.api` can point at a POST endpoint instead - it receives
 POST every few seconds costs money at scale and buys nothing over a static file.
 ```
 Aether/
-├── main.lua                  loader (the only file users run)
-├── version.json              rev + notes the update check polls
-├── core/
-│   ├── env.lua               services, executor checks, cleanup list
-│   ├── games.lua             game shelves: arsenal, tesla, universal
-│   ├── theme.lua             colours and fonts
-│   ├── util.lua              new, tween, corner, stroke, pad, drawX, label
-│   ├── notify.lua            ScreenGui and toasts
-│   ├── sfx.lua               one pitched voice for every interaction
-│   ├── physics.lua           elastic window drag and throw
-│   ├── window.lua            window, shadow, header, sidebar, drag
-│   ├── depth.lua             cursor parallax and throw inertia
-│   ├── motion.lua            staggered entrances, magnetism, ripples
-│   ├── widgets.lua           toggle, slider, button, dropdown, keybind
-│   ├── colorpicker.lua       saturation/value picker for the accent
-│   └── pagekit.lua           makePage, makeConfig, gear, page hooks
-├── modules/
-│   ├── filter.lua            whitelist/blacklist and UI-mask helpers
-│   ├── character.lua         fly, noclip, inf jump, anti-AFK, fullbright
-│   ├── esp.lua
-│   ├── aim.lua               arsenal shelf
-│   ├── silentaim.lua         arsenal shelf
-│   ├── killaura.lua          arsenal shelf
-│   ├── projectile.lua        arsenal shelf: gravity counter
-│   ├── tesla.lua             tesla shelf: cold gas, auto-pilot, saved spots
-│   └── actions.lua           teleport, rejoin, hop, auto-execute, copy
-├── pages/
-│   ├── character.lua
-│   ├── movement.lua
-│   ├── visuals.lua
-│   ├── combat.lua            aimbot, silent aim, kill aura (arsenal)
-│   ├── tesla.lua             vehicle, cold gas, auto-pilot, spots (tesla)
-│   ├── players.lua
-│   ├── games.lua             active shelf, switch and restart
-│   └── ui.lua                keybind list toggle, rescaling, window physics
-└── tail/
-    ├── keylist.lua           keybind list overlay
-    ├── extras.lua            easter egg
-    ├── hud.lua               stats HUD: fps, ping, players
-    ├── glass.lua             glass blur and Liquid Glass
-    ├── settings.lua          accent colour, config save/load, session actions
-    ├── tts.lua               read-aloud: hover, progress bar, first-run prompt
-    ├── keybinds.lua          key handlers and the Keybinds page
-    ├── updater.lua           update check, prompt, restart
-    ├── announcements.lua     read-only notes from announcements.json
-    ├── admin.lua             owner panel (one account, local check only)
-    └── startup.lua           show/hide, search, startup animation
+â”œâ”€â”€ main.lua                  loader (the only file users run)
+â”œâ”€â”€ version.json              rev + notes the update check polls
+â”œâ”€â”€ core/
+â”‚   â”œâ”€â”€ env.lua               services, executor checks, cleanup list
+â”‚   â”œâ”€â”€ games.lua             game shelves: arsenal, tesla, universal
+â”‚   â”œâ”€â”€ theme.lua             colours and fonts
+â”‚   â”œâ”€â”€ util.lua              new, tween, corner, stroke, pad, drawX, label
+â”‚   â”œâ”€â”€ notify.lua            ScreenGui and toasts
+â”‚   â”œâ”€â”€ sfx.lua               one pitched voice for every interaction
+â”‚   â”œâ”€â”€ physics.lua           elastic window drag and throw
+â”‚   â”œâ”€â”€ window.lua            window, shadow, header, sidebar, drag
+â”‚   â”œâ”€â”€ depth.lua             cursor parallax and throw inertia
+â”‚   â”œâ”€â”€ motion.lua            staggered entrances, magnetism, ripples
+â”‚   â”œâ”€â”€ widgets.lua           toggle, slider, button, dropdown, keybind
+â”‚   â”œâ”€â”€ colorpicker.lua       saturation/value picker for the accent
+â”‚   â””â”€â”€ pagekit.lua           makePage, makeConfig, gear, page hooks
+â”œâ”€â”€ modules/
+â”‚   â”œâ”€â”€ filter.lua            whitelist/blacklist and UI-mask helpers
+â”‚   â”œâ”€â”€ character.lua         fly, noclip, inf jump, anti-AFK, fullbright
+â”‚   â”œâ”€â”€ esp.lua
+â”‚   â”œâ”€â”€ aim.lua               arsenal shelf
+â”‚   â”œâ”€â”€ silentaim.lua         arsenal shelf
+â”‚   â”œâ”€â”€ killaura.lua          arsenal shelf
+â”‚   â”œâ”€â”€ projectile.lua        arsenal shelf: gravity counter
+â”‚   â”œâ”€â”€ tesla.lua             tesla shelf: cold gas, auto-pilot, saved spots
+â”‚   â””â”€â”€ actions.lua           teleport, rejoin, hop, auto-execute, copy
+â”œâ”€â”€ pages/
+â”‚   â”œâ”€â”€ character.lua
+â”‚   â”œâ”€â”€ movement.lua
+â”‚   â”œâ”€â”€ visuals.lua
+â”‚   â”œâ”€â”€ combat.lua            aimbot, silent aim, kill aura (arsenal)
+â”‚   â”œâ”€â”€ tesla.lua             vehicle, cold gas, auto-pilot, spots (tesla)
+â”‚   â”œâ”€â”€ players.lua
+â”‚   â”œâ”€â”€ games.lua             active shelf, switch and restart
+â”‚   â””â”€â”€ ui.lua                keybind list toggle, rescaling, window physics
+â””â”€â”€ tail/
+    â”œâ”€â”€ keylist.lua           keybind list overlay
+    â”œâ”€â”€ extras.lua            easter egg
+    â”œâ”€â”€ hud.lua               stats HUD: fps, ping, players
+    â”œâ”€â”€ glass.lua             glass blur and Liquid Glass
+    â”œâ”€â”€ settings.lua          accent colour, config save/load, session actions
+    â”œâ”€â”€ tts.lua               read-aloud: hover, progress bar, first-run prompt
+    â”œâ”€â”€ keybinds.lua          key handlers and the Keybinds page
+    â”œâ”€â”€ updater.lua           update check, prompt, restart
+    â”œâ”€â”€ announcements.lua     read-only notes from announcements.json
+    â”œâ”€â”€ admin.lua             owner panel (one account, local check only)
+    â””â”€â”€ startup.lua           show/hide, search, startup animation
 ```
-
-## internet tycoon
-
-Place `10767564282`. Its own shelf, so the tab only appears in that game - the
-loader decides the shelf from the place id before it fetches anything, and this
-one is `tycoon`.
-
-- **Money** - the balance is a leaderstats value, a value in a folder on the
-  player, or a player attribute; the page scans for the most money-shaped one
-  (`Cash`, `Money`, `Dollars`, `Funds`, ...) and says which it took. The box holds
-  the real number, `Set`/Enter writes it, and `Keep it there` re-applies it every
-  0.35s - which is the only part of a server-reconciled balance a client can hold.
-- **Thunderstorms** - the storm that eats cables and towers is game state, so the
-  page finds the switches (weather/storm/thunder/rain values and attributes it can
-  see on `Lighting`, the player, `workspace` and `ReplicatedStorage`), pins them to
-  calm once a second while it is on, and switches off lightning and thunder effects
-  that are already running - `Enabled = false`, saved and restored, never deleted.
-  A storm the server has already run is not undone by this: the damage is the
-  server's, the sky in front of you is the client's.
-
-Both features are honest about the line they cannot cross: a client write reports
-what it read back, and "server-owned" means exactly that.
