@@ -53,9 +53,22 @@ local header = new("Frame", {
 label({ Text = "Aether", Font = FONT.bold, TextSize = 18, Position = UDim2.fromOffset(18, 11), Size = UDim2.fromOffset(140, 22), Parent = header })
 label({
 	Text = string.format("<font color=\"#79818C\">%s</font>  ·  <font color=\"#79818C\">%s</font>  ·  <font color=\"#79818C\">%s</font>", A.executorName, LP.Name, tostring(A.build or "?")),
-	TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(18, 31), Size = UDim2.fromOffset(430, 14), Parent = header,
+	TextSize = 11, TextTruncate = Enum.TextTruncate.AtEnd, Position = UDim2.fromOffset(18, 31), Size = UDim2.fromOffset(360, 14), Parent = header,
 })
 
+-- which shelf this session is on: arsenal, tesla or universal. The loader picks
+-- it before the first file is fetched, so it never changes while running - which
+-- is exactly why it belongs in the header rather than on a page.
+local gamePill = new("Frame", {
+	AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -50, 0, 16),
+	Size = UDim2.fromOffset(132, 22), BackgroundColor3 = T.raised,
+	BackgroundTransparency = 0.25, BorderSizePixel = 0, Parent = header,
+}, { new("UICorner", { CornerRadius = UDim.new(0, 6) }) })
+local gameName = A.game and A.game.name or "Universal"
+label({
+	Text = gameName, TextSize = 10, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Center,
+	TextTruncate = Enum.TextTruncate.AtEnd, Size = UDim2.fromScale(1, 1), Parent = gamePill,
+})
 local closeBtn = new("TextButton", {
 	Text = "", Font = FONT.med, TextSize = 14, TextColor3 = T.muted,
 	BackgroundColor3 = T.raised, AutoButtonColor = false, BorderSizePixel = 0,

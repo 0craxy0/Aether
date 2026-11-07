@@ -6,51 +6,58 @@ local BASE = "https://raw.githubusercontent.com/0craxy0/Aether/main/"
 -- turn a bad download into a confusing syntax error at best and an OOM at worst.
 local MAX_BYTES = 2 * 1024 * 1024
 
+-- Every entry is { path, group }. No group means core: it loads on every shelf.
+-- "arsenal" is the combat set, "tesla" the vehicle set; the universal shelf loads
+-- every group, which is the whole point of it.
 local FILES = {
-	"core/env.lua",
-	"core/theme.lua",
-	"core/util.lua",
-	"core/notify.lua",
-	"core/sfx.lua",
-	"core/physics.lua",
-	"core/window.lua",
-	"core/depth.lua",
-	"core/motion.lua",
-	"core/widgets.lua",
-	"core/colorpicker.lua", -- after widgets: it is a widget built from rowBase
-	"modules/filter.lua",
-	"modules/character.lua",
-	"modules/esp.lua",
-	"modules/aim.lua",
-	"modules/silentaim.lua",
-	"modules/killaura.lua",
-	"modules/projectile.lua",
-	"modules/actions.lua",
-	"core/pagekit.lua",
-	"pages/character.lua",
-	"pages/movement.lua",
-	"pages/visuals.lua",
-	"pages/combat.lua",
-	"pages/players.lua",
-	"tail/keylist.lua",   -- before pages/ui (it creates A.kbList)
-	"pages/ui.lua",       -- creates A.sUI4 for the files below
-	"tail/extras.lua",
-	"tail/hud.lua",
-	"tail/glass.lua",
-	"tail/settings.lua",
-	"tail/tts.lua",       -- after settings: it reads and writes the config extras
-	"tail/announcements.lua", -- after settings (extras) and pages/ui (A.sUI4)
-	"tail/keybinds.lua",
-	"tail/startup.lua",
-	"tail/updater.lua",
-	"tail/admin.lua",     -- last: it reads A.updater and A.announce
+	{ "core/env.lua" },
+	{ "core/games.lua" }, -- right after env: it only reads A
+	{ "core/theme.lua" },
+	{ "core/util.lua" },
+	{ "core/notify.lua" },
+	{ "core/sfx.lua" },
+	{ "core/physics.lua" },
+	{ "core/window.lua" },
+	{ "core/depth.lua" },
+	{ "core/motion.lua" },
+	{ "core/widgets.lua" },
+	{ "core/colorpicker.lua" }, -- after widgets: it is a widget built from rowBase
+	{ "modules/filter.lua" },
+	{ "modules/character.lua" }, -- walk speed, noclip, anti-afk: every shelf
+	{ "modules/esp.lua" },
+	{ "modules/actions.lua" },
+	{ "modules/aim.lua", "arsenal" },
+	{ "modules/silentaim.lua", "arsenal" },
+	{ "modules/killaura.lua", "arsenal" },
+	{ "modules/projectile.lua", "arsenal" },
+	{ "modules/tesla.lua", "tesla" },
+	{ "core/pagekit.lua" },
+	{ "pages/character.lua" },
+	{ "pages/movement.lua" },
+	{ "pages/visuals.lua" },
+	{ "pages/combat.lua", "arsenal" },
+	{ "pages/tesla.lua", "tesla" },
+	{ "pages/players.lua" },
+	{ "tail/keylist.lua" }, -- before pages/ui (it creates A.kbList)
+	{ "pages/ui.lua" }, -- creates A.sUI4 for the files below
+	{ "tail/extras.lua" },
+	{ "tail/hud.lua" },
+	{ "tail/glass.lua" },
+	{ "tail/settings.lua" },
+	{ "tail/tts.lua" }, -- after settings: it reads and writes the config extras
+	{ "tail/announcements.lua" }, -- after settings (extras) and pages/ui (A.sUI4)
+	{ "tail/keybinds.lua" },
+	{ "pages/games.lua" }, -- after Keybinds: the sidebar order is creation order
+	{ "tail/startup.lua" },
+	{ "tail/updater.lua" },
+	{ "tail/admin.lua" }, -- last: it reads A.updater and A.announce
 }
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-07.30"
+local BUILD = "2026-11-07.31"
 -- monotonic: the updater compares rev, never the date string
-local REV = 30
+local REV = 31
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -62,6 +69,26 @@ local function url(path)
 end
 
 local A = { base = BASE, build = BUILD, rev = REV }
+
+-- Game shelf. It has to be decided here, before the first fetch, because FILES
+-- is filtered by it; core/games.lua only turns the key into a record for the UI.
+-- The override exists for a game whose id is not in the table yet (or for testing
+-- a shelf from a place it was not written for).
+local PLACE_ARSENAL = 286090429
+local PLACE_TESLA = 1794074302239
+local forced = getgenv and getgenv().AetherGame
+local key
+if forced == "arsenal" or forced == "tesla" or forced == "universal" then
+	key = forced
+elseif game.PlaceId == PLACE_ARSENAL then
+	key = "arsenal"
+elseif game.PlaceId == PLACE_TESLA then
+	key = "tesla"
+else
+	key = "universal"
+end
+A.profile = key
+A.place = game.PlaceId
 
 -- lets auto-execute on teleport re-run this loader. The private copy is the one
 -- the queue string is built from; the getgenv one stays for compatibility and is
@@ -279,18 +306,28 @@ local function fetch(path)
 	return src
 end
 
-for _, path in ipairs(FILES) do
-	local src, why = fetch(path)
-	if not src then
-		return fail("could not download " .. path .. ": " .. tostring(why))
-	end
-	local fn, compileErr = loadstring(src, "@" .. path)
-	if not fn then
-		return fail("syntax error in " .. path .. ": " .. tostring(compileErr))
-	end
-	local okRun, runErr = pcall(fn, A)
-	if not okRun then
-		return fail("error in " .. path .. ": " .. tostring(runErr))
+-- no group = core; universal carries every group by design
+local function loadsWith(group)
+	if not group then return true end
+	if A.profile == "universal" then return true end
+	return group == A.profile
+end
+
+for _, entry in ipairs(FILES) do
+	local path, group = entry[1], entry[2]
+	if loadsWith(group) then
+		local src, why = fetch(path)
+		if not src then
+			return fail("could not download " .. path .. ": " .. tostring(why))
+		end
+		local fn, compileErr = loadstring(src, "@" .. path)
+		if not fn then
+			return fail("syntax error in " .. path .. ": " .. tostring(compileErr))
+		end
+		local okRun, runErr = pcall(fn, A)
+		if not okRun then
+			return fail("error in " .. path .. ": " .. tostring(runErr))
+		end
 	end
 end
 

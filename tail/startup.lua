@@ -186,6 +186,8 @@ local function show()
 	if not (A.screen and A.screen.Parent) then return end
 	A.loadingDone = true
 	A.screen.Enabled = true
+	-- pages whose rows come from config (saved spots) were built before it loaded
+	if A.refreshPages then A.refreshPages() end
 	window.Size = UDim2.fromOffset(A.W * 0.8, A.H * 0.8)
 	window.GroupTransparency = 1
 	tween(window, 0.8, { Size = UDim2.fromOffset(A.W, A.H), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)

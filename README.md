@@ -32,6 +32,49 @@ Dropdowns behave like dropdowns now: opening one closes any other, a click
 outside the row closes it, it closes when you leave the page, and its caret
 turns over while the list is out.
 
+## games
+
+Aether is a hub, not an Arsenal script with a theme. `main.lua` decides a **shelf**
+from `game.PlaceId` *before it downloads the first file*, because the file list is
+what changes:
+
+| shelf | place | carries |
+|---|---|---|
+| `arsenal` | `286090429` | combat (aim, silent aim, kill aura, projectile counter), visuals, movement |
+| `tesla` | `1794074302239` | vehicle tools only - cold gas, auto-pilot |
+| `universal` | anything else | every module in one shelf, none of it calibrated |
+
+Universal is the honest default: an untested game gets the whole toolbox, and the
+Games page says so rather than implying a tune it does not have. The shelf shows
+as a pill in the header; the Games page lists all three and restarts into the one
+you pick (config is flushed first, same path the updater uses). `getgenv().AetherGame`
+overrides detection for a place that is not in the table.
+
+## flying tesla roadster
+
+The Tesla page is two tools and a camera:
+
+- **Cold gas** - a poller, not a packet. Every number in the car, or attribute on
+  it, whose name looks like `gas`/`boost`/`nitro`/`turbo`/`charge` is held at the
+  highest value it has ever had. Nothing is invented, so a 100-charge bar stays at
+  100 and a 0..1 multiplier stays at its maximum. `Scan gas values` prints every
+  candidate it found, which is the list you want if a future update renames it.
+- **Auto-pilot** - middle-click the spot you want on the map. A scriptable camera
+  takes over, orbiting the point so you can see what you picked; the scroll wheel
+  raises it (`Destination height` in the page follows the wheel). `Drive` (or
+  Enter) hands it to the controller, `Cancel` (or Escape) puts your camera back.
+  Default is `Seat inputs`: throttle and steer on the `VehicleSeat`, scaled by
+  distance and aimed by heading error, with a short reverse manoeuvre instead of
+  looping the block. `Velocity assist` pushes the assembly for custom chassis.
+  `Invert steering` is the one-click fix if your car steers the wrong way.
+- **Saved spots** - `Save destination` stores the point in your config under
+  `teslaSpots`; each saved row has a `DRIVE` button, so the places you keep
+  visiting are one click, not a re-pick.
+
+Tuning notes that cannot be settled without the game open: steering sign (see the
+toggle), and the throttle floor at close range (0.45 - raise it if the car stalls
+on a slope). Both live in `modules/tesla.lua`'s drive step.
+
 ## loading
 
 `main.lua` draws a small centred card before it fetches the first file, then
@@ -193,6 +236,7 @@ Aether/
 ├── version.json              rev + notes the update check polls
 ├── core/
 │   ├── env.lua               services, executor checks, cleanup list
+│   ├── games.lua             game shelves: arsenal, tesla, universal
 │   ├── theme.lua             colours and fonts
 │   ├── util.lua              new, tween, corner, stroke, pad, drawX, label
 │   ├── notify.lua            ScreenGui and toasts
@@ -202,21 +246,26 @@ Aether/
 │   ├── depth.lua             cursor parallax and throw inertia
 │   ├── motion.lua            staggered entrances, magnetism, ripples
 │   ├── widgets.lua           toggle, slider, button, dropdown, keybind
-│   └── pagekit.lua           makePage, makeConfig, gear, config menu open/close
+│   ├── colorpicker.lua       saturation/value picker for the accent
+│   └── pagekit.lua           makePage, makeConfig, gear, page hooks
 ├── modules/
 │   ├── filter.lua            whitelist/blacklist and UI-mask helpers
 │   ├── character.lua         fly, noclip, inf jump, anti-AFK, fullbright
 │   ├── esp.lua
-│   ├── aim.lua
-│   ├── silentaim.lua
-│   ├── killaura.lua
+│   ├── aim.lua               arsenal shelf
+│   ├── silentaim.lua         arsenal shelf
+│   ├── killaura.lua          arsenal shelf
+│   ├── projectile.lua        arsenal shelf: gravity counter
+│   ├── tesla.lua             tesla shelf: cold gas, auto-pilot, saved spots
 │   └── actions.lua           teleport, rejoin, hop, auto-execute, copy
 ├── pages/
 │   ├── character.lua
 │   ├── movement.lua
 │   ├── visuals.lua
-│   ├── combat.lua            aimbot, silent aim, kill aura
+│   ├── combat.lua            aimbot, silent aim, kill aura (arsenal)
+│   ├── tesla.lua             vehicle, cold gas, auto-pilot, spots (tesla)
 │   ├── players.lua
+│   ├── games.lua             active shelf, switch and restart
 │   └── ui.lua                keybind list toggle, rescaling, window physics
 └── tail/
     ├── keylist.lua           keybind list overlay

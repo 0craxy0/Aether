@@ -16,6 +16,11 @@ A.keybind(sKeys, "Toggle kill aura")
 A.keybind(sKeys, "Toggle noclip", "N")
 A.keybind(sKeys, "Toggle ESP")
 A.keybind(sKeys, "Toggle fullbright")
+-- vehicle shelf only: the rows do not exist on Arsenal, so neither do the binds
+if A.Tesla then
+	A.keybind(sKeys, "Toggle cold gas")
+	A.keybind(sKeys, "Toggle auto-pilot")
+end
 
 local sKeys2 = pKeys.section("Interface", 2)
 A.keybind(sKeys2, "Toggle UI", "RightShift")
@@ -43,6 +48,15 @@ local actions = {
 	["Toggle fullbright"] = flip("Fullbright"),
 	["Toggle UI"] = function() if A.toggleUI then A.toggleUI() end end,
 	["Teleport to cursor"] = function() A.tpToCursor() end,
+	["Toggle cold gas"] = function()
+		for _, e in ipairs(A.registry) do
+			if e.name == "Infinite cold gas" and e.load and e.save then
+				e.load(not e.save())
+				return
+			end
+		end
+	end,
+	["Toggle auto-pilot"] = function() if A.Tesla then A.Tesla.auto.toggle() end end,
 }
 
 -- Binds are read from the live map. The old version compared against a snapshot

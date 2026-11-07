@@ -1,6 +1,6 @@
 {
-  "rev": 30,
-  "build": "2026-11-07.30",
-  "notes": "The panel no longer appears behind the loading card. Its ScreenGui is built but disabled until the card has faded, then the window animates in exactly as before. Announcements and update checks wait for that moment too, so a notice or prompt can never be raised while nobody can see it.",
+  "rev": 31,
+  "build": "2026-11-07.31",
+  "notes": "Aether is now a multi-game hub. The loader picks a shelf by place id before it downloads anything: Arsenal (combat, tuned), Flying Tesla Roadster (vehicle tools), or Universal (every module, untuned). The Games page shows which shelf is active and restarts into another one. New Tesla page: infinite cold gas, and an auto-pilot where you middle-click a spot, scroll to set its height while a scriptable camera holds it in view, then drive there - with saved spots for the places on the map you keep going back to.",
   "loader": "main.lua"
 }

@@ -19,6 +19,15 @@ local function tabIndex(name)
 	return 1
 end
 
+-- Page hooks: a page whose rows are built from config (saved spots, the profile
+-- list) has to be told when it becomes visible, and once after the config has
+-- loaded. Called at the end of selectPage and from tail/startup.lua's reveal.
+A.pageHooks = {}
+function A.onPage(fn) A.pageHooks[#A.pageHooks + 1] = fn end
+function A.refreshPages(name)
+	for _, fn in ipairs(A.pageHooks) do pcall(fn, name) end
+end
+
 local function selectPage(name)
 	-- an expanded dropdown belongs to the page it was opened on; leaving it open
 	-- would also leave the page's canvas taller than the rows it now shows
@@ -51,6 +60,7 @@ local function selectPage(name)
 		tween(page.btn, 0.25, { TextColor3 = on and T.accent or T.muted })
 		tween(page.btn, 0.25, { BackgroundTransparency = on and 0.82 or 1, BackgroundColor3 = T.accent })
 	end
+	A.refreshPages(name)
 end
 A.selectPage = selectPage
 
