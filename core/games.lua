@@ -16,11 +16,11 @@ local A = ...
 -- says out loud rather than pretending otherwise.
 local LIST = {
 	{
-		key = "arsenal", name = "Arsenal", place = 286090429,
+		key = "arsenal", name = "Arsenal", place = (A.placeIds or {}).arsenal,
 		blurb = "Combat, visuals and movement, tuned against Arsenal's hit registration.",
 	},
 	{
-		key = "tesla", name = "Flying Tesla Roadster", place = 1794074302239,
+		key = "tesla", name = "Flying Tesla Roadster", place = (A.placeIds or {}).tesla,
 		blurb = "Open world update: infinite cold gas and auto-pilot with a height-picking camera.",
 	},
 	{
@@ -64,3 +64,36 @@ end
 function A.clearProfile()
 	if getgenv then getgenv().AetherGame = nil end
 end
+
+-- Follow the place ------------------------------------------------------------
+-- A teleport changes game.PlaceId under a loader that is already running, and the
+-- shelf - and therefore the file list - was fixed when this one was fetched. The
+-- only correct answer is to come back up on the shelf the new place wants, so the
+-- loader restarts itself. A manual override is dropped first: it was a statement
+-- about the old place, not about this one.
+local watching = true
+task.spawn(function()
+	local last = A.place or game.PlaceId
+	while watching do
+		task.wait(2)
+		local now = game.PlaceId
+		if now ~= last then
+			last = now
+			A.place = now
+			local want = (A.detectProfile and A.detectProfile(now)) or "universal"
+			if getgenv then getgenv().AetherGame = nil end
+			if want ~= A.profile then
+				if A.notify then
+					A.notify("Games", "place changed · loading " .. ((A.games[want] or {}).name or want), "good")
+				end
+				task.wait(1.2)
+				if watching and A.updater and A.updater.restart then
+					pcall(A.updater.restart)
+				elseif A.notify then
+					A.notify("Games", "re-execute the loader to switch shelf", "bad")
+				end
+			end
+		end
+	end
+end)
+A.onCleanup(function() watching = false end)

@@ -55,9 +55,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-07.31"
+local BUILD = "2026-11-07.32"
 -- monotonic: the updater compares rev, never the date string
-local REV = 31
+local REV = 32
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -71,24 +71,33 @@ end
 local A = { base = BASE, build = BUILD, rev = REV }
 
 -- Game shelf. It has to be decided here, before the first fetch, because FILES
--- is filtered by it; core/games.lua only turns the key into a record for the UI.
--- The override exists for a game whose id is not in the table yet (or for testing
--- a shelf from a place it was not written for).
-local PLACE_ARSENAL = 286090429
-local PLACE_TESLA = 1794074302239
+-- is filtered by it; core/games.lua only turns the key into a record for the UI
+-- and watches for a teleport that changes the answer.
+--
+-- The place ids live here, once: the loader is the only thing that can use them
+-- before the first file exists, so it owns them and publishes them for the rest.
+local PLACE_IDS = { arsenal = 286090429, tesla = 1794074302239 }
+
+local function detectProfile(place)
+	if place == PLACE_IDS.arsenal then return "arsenal" end
+	if place == PLACE_IDS.tesla then return "tesla" end
+	return "universal"
+end
+
+A.placeIds = PLACE_IDS
+A.detectProfile = detectProfile
+A.place = game.PlaceId
+-- The override exists for a game whose id is not in the table yet (or for
+-- testing a shelf from a place it was not written for). It is cleared the moment
+-- the place changes, so "forced" never survives into a game it was not about.
 local forced = getgenv and getgenv().AetherGame
 local key
 if forced == "arsenal" or forced == "tesla" or forced == "universal" then
 	key = forced
-elseif game.PlaceId == PLACE_ARSENAL then
-	key = "arsenal"
-elseif game.PlaceId == PLACE_TESLA then
-	key = "tesla"
 else
-	key = "universal"
+	key = detectProfile(A.place)
 end
 A.profile = key
-A.place = game.PlaceId
 
 -- lets auto-execute on teleport re-run this loader. The private copy is the one
 -- the queue string is built from; the getgenv one stays for compatibility and is

@@ -101,9 +101,26 @@ local body = new("Frame", {
 	BackgroundTransparency = 1, Parent = window,
 })
 
-local sidebar = new("Frame", {
+-- The sidebar is a ScrollingFrame, not a Frame with a list: with ten pages on the
+-- universal shelf the list is taller than the body, and a CanvasGroup does not
+-- clip its children - so tabs were drawn past the window's own edge, over the
+-- blur and over the page behind them. Clipping is the fix; the controller below
+-- is why it moves smoothly.
+local sidebar = new("ScrollingFrame", {
 	Size = UDim2.new(0, 140, 1, 0),
 	BackgroundColor3 = T.panel, BorderSizePixel = 0, Parent = body,
+	CanvasSize = UDim2.new(0, 0, 0, 0),
+	AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollingDirection = Enum.ScrollingDirection.Y,
+	-- the engine's wheel step snaps; this frame is driven by the controller below
+	-- so a flick eases and a drag is 1:1, and the engine never moves it as well
+	ScrollingEnabled = false,
+	ScrollBarThickness = 0,
+	ScrollBarImageColor3 = T.muted,
+	ScrollBarImageTransparency = 0.7,
+	VerticalScrollBarInset = Enum.ScrollBarInset.None,
+	ClipsDescendants = true,
+	ElasticBehavior = Enum.ElasticBehavior.Always,
 })
 corner(sidebar, 9)
 pad(sidebar, 7)
@@ -113,6 +130,93 @@ local content = new("Frame", {
 	Position = UDim2.fromOffset(150, 0), Size = UDim2.new(1, -150, 1, 0),
 	BackgroundTransparency = 1, Parent = body,
 })
+
+-- sidebar scrolling ------------------------------------------------------------
+-- One easing controller for both input paths. The target lives in canvas space
+-- and the applied position chases it at a fixed rate, so a wheel flick glides to
+-- a stop instead of jumping a row at a time.
+local SBS = { y = 0, target = 0, conn = nil, dragging = false, from = 0, base = 0 }
+
+local function sbMax()
+	return math.max(0, sidebar.AbsoluteCanvasSize.Y - sidebar.AbsoluteSize.Y)
+end
+
+local function sbApply()
+	sidebar.CanvasPosition = Vector2.new(0, math.clamp(SBS.y, 0, sbMax()))
+end
+
+local function sbStep(dt)
+	SBS.target = math.clamp(SBS.target, 0, sbMax())
+	local d = SBS.target - SBS.y
+	if math.abs(d) < 0.2 then
+		SBS.y = SBS.target
+		sbApply()
+		if SBS.conn then SBS.conn:Disconnect(); SBS.conn = nil end
+		return
+	end
+	SBS.y += d * math.min(1, dt * 16)
+	sbApply()
+end
+
+local function sbDrive()
+	if not SBS.conn then SBS.conn = A.RunService.Heartbeat:Connect(sbStep) end
+end
+
+local function sbScrollBy(delta)
+	SBS.target = math.clamp(SBS.target + delta, 0, sbMax())
+	sbDrive()
+end
+
+-- keep the tab that just became active inside the viewport, with a little air
+function A.revealTab(btn)
+	if not btn or sidebar.AbsoluteSize.Y <= 0 then return end
+	local y = btn.AbsolutePosition.Y - sidebar.AbsolutePosition.Y + sidebar.CanvasPosition.Y
+	local h = btn.AbsoluteSize.Y
+	local viewH = sidebar.AbsoluteSize.Y
+	local inset = 8
+	if y - inset < SBS.target then
+		SBS.target = math.max(y - inset, 0)
+		sbDrive()
+	elseif y + h + inset > SBS.target + viewH then
+		SBS.target = y + h + inset - viewH
+		sbDrive()
+	end
+end
+
+UserInputService.InputChanged:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseWheel then
+		-- window space: AbsolutePosition starts at the topbar, the pointer does not
+		local m = UserInputService:GetMouseLocation()
+		local p, s = sidebar.AbsolutePosition, sidebar.AbsoluteSize
+		local y = m.Y - (A.guiInset or 0)
+		if m.X >= p.X and m.X <= p.X + s.X and y >= p.Y and y <= p.Y + s.Y then
+			sbScrollBy(-i.Position.Z * 36)
+		end
+	elseif SBS.dragging then
+		if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+			local d = i.Position.Y - SBS.from
+			if math.abs(d) > 3 then
+				SBS.target = math.clamp(SBS.base - d, 0, sbMax())
+				SBS.y = SBS.target
+				sbApply()
+			end
+		end
+	end
+end)
+
+sidebar.InputBegan:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		SBS.dragging = true
+		SBS.from = i.Position.Y
+		SBS.base = SBS.y
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		SBS.dragging = false
+	end
+end)
 
 -- ── drag ──────────────────────────────────────────────────────
 do

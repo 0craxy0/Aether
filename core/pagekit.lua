@@ -60,6 +60,7 @@ local function selectPage(name)
 		tween(page.btn, 0.25, { TextColor3 = on and T.accent or T.muted })
 		tween(page.btn, 0.25, { BackgroundTransparency = on and 0.82 or 1, BackgroundColor3 = T.accent })
 	end
+	if A.revealTab then pcall(A.revealTab, page.btn) end
 	A.refreshPages(name)
 end
 A.selectPage = selectPage

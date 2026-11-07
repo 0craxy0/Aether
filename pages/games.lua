@@ -72,10 +72,11 @@ end
 
 local sInfo = pG.section("How this works", 3)
 label({
-	Text = "Arsenal and Tesla are tuned shelves: only the modules that make sense for that game are fetched. "
-		.. "Universal is the default for anything else - every module in one shelf, none of it calibrated, so expect to tune it yourself.",
+	Text = "Detection follows the place: teleport into a supported game and the loader restarts itself on that shelf. "
+		.. "Arsenal and Tesla are tuned - only the modules that make sense for that game are fetched. "
+		.. "Universal is the default for anything else: every module in one shelf, none of it calibrated.",
 	TextColor3 = T.muted, TextSize = 11, TextWrapped = true,
-	Size = UDim2.new(1, 0, 0, 58), Parent = sInfo,
+	Size = UDim2.new(1, 0, 0, 66), Parent = sInfo,
 })
 local auto = new("TextButton", {
 	Text = "BACK TO AUTO-DETECT", Font = FONT.bold, TextSize = 10, TextColor3 = T.text,
@@ -89,7 +90,7 @@ auto.MouseButton1Click:Connect(function()
 	restart()
 end)
 label({
-	Text = "Detection is by place id, decided before the first file is downloaded - that is why a shelf change restarts the loader rather than rebuilding the pages.",
+	Text = "The shelf is decided by place id before the first file is downloaded, so a switch restarts the loader instead of rebuilding pages. A manual choice sticks for this place only - the next teleport returns to auto-detect.",
 	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
-	Size = UDim2.new(1, 0, 0, 34), Parent = sInfo,
+	Size = UDim2.new(1, 0, 0, 40), Parent = sInfo,
 })

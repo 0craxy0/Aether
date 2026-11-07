@@ -1,6 +1,6 @@
 {
-  "rev": 31,
-  "build": "2026-11-07.31",
-  "notes": "Aether is now a multi-game hub. The loader picks a shelf by place id before it downloads anything: Arsenal (combat, tuned), Flying Tesla Roadster (vehicle tools), or Universal (every module, untuned). The Games page shows which shelf is active and restarts into another one. New Tesla page: infinite cold gas, and an auto-pilot where you middle-click a spot, scroll to set its height while a scriptable camera holds it in view, then drive there - with saved spots for the places on the map you keep going back to.",
+  "rev": 32,
+  "build": "2026-11-07.32",
+  "notes": "The shelf now follows the place: teleport into Arsenal or Flying Tesla Roadster and the loader restarts itself onto the right module set, dropping any manual override on the way. The sidebar is a clipped scroller with one easing controller - wheel flicks glide instead of snapping a row at a time, touch drag is 1:1, and tabs can no longer draw past the window edge over the page behind them.",
   "loader": "main.lua"
 }
