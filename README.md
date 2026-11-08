@@ -1,4 +1,6 @@
-﻿# aether, the actual best script  on roblox, called "aether"
+﻿# aether, the actual best script  on roblox, called "aether
+## note: im stopping developing and updating for a month or so, after rapid fire updates.
+
 ## contents
 - uhh basically just a really good script
 - ton of features
