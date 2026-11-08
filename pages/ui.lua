@@ -37,6 +37,23 @@ local function rsApplySize(nw, nh)
 end
 A.RS, A.rsApplySize = RS, rsApplySize
 
+-- layout persistence ---------------------------------------------------------
+-- A size you dragged out is a setting like every other one, so it rides the same
+-- config file instead of being forgotten between sessions. Registered without a
+-- row: the registry is a list of saved values first and a search index second,
+-- and search skips an entry with no row.
+A.register(nil, "Window layout", function(v)
+	if type(v) ~= "table" then return end
+	local w, h = tonumber(v.w), tonumber(v.h)
+	if not (w and h) then return end
+	rsApplySize(
+		math.floor(math.clamp(w, RS.minW, RS.maxW)),
+		math.floor(math.clamp(h, RS.minH, RS.maxH))
+	)
+end, function()
+	return { w = RS.vw, h = RS.vh }
+end)
+
 local rsCorners = {
 	{ -1, -1, Vector2.new(0, 0) }, { 1, -1, Vector2.new(1, 0) },
 	{ -1, 1, Vector2.new(0, 1) }, { 1, 1, Vector2.new(1, 1) },
@@ -80,6 +97,7 @@ local rsMove = UserInputService.InputChanged:Connect(function(i)
 end)
 local rsEnd = UserInputService.InputEnded:Connect(function(i)
 	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		if RS.drag and A.touch then A.touch() end -- remember the size the user settled on
 		RS.drag = nil
 	end
 end)
@@ -94,7 +112,10 @@ toggle(sUI2, "Scale UI contents", true, function(v)
 	RS.scaleOn = v
 	rsApplySize(RS.vw, RS.vh)
 end)
-button(sUI2, "Reset UI size", "RESET", function() rsApplySize(RS.defW, RS.defH) end)
+button(sUI2, "Reset UI size", "RESET", function()
+	rsApplySize(RS.defW, RS.defH)
+	if A.touch then A.touch() end
+end)
 toggle(sUI2, "Apply sliders on release", true, function(v) KB.opts.sliderRelease = v end)
 
 local sUI3 = pUI.section("Window physics", 3)
