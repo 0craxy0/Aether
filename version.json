@@ -1,6 +1,6 @@
 {
-  "rev": 71,
-  "build": "2026-11-08.71",
-  "notes": "Rows that are not self-explanatory now end their label with a small '?'. Put the pointer on it and a tooltip the size of its own text appears - wrapped, clamped to the screen, and placed below the mark or above it when there is no room underneath. Twenty-six rows have one, spread across Character, Visuals, World, UI, Settings, Send a Global Message and the owner panel; anything guessable from the name (Noclip, Fullbright, WalkSpeed) is untouched, so a row with an explanation looks like a row that has one. The mark sits where the label ends, measured with TextService, and above the row's own hit area so a toggle's transparent button does not swallow the hover. A.help(\"Row name\", \"text\") is public, and a name that is not on this shelf is a no-op rather than an error.",
+  "rev": 72,
+  "build": "2026-11-08.72",
+  "notes": "Rows that are not self-explanatory now end their label with a small '?'. Put the pointer on it and a tooltip the size of its own text appears - wrapped, clamped to the screen, and placed below the mark or above it when there is no room underneath. Twenty-six rows have one, spread across Character, Visuals, World, UI, Settings, Send a Global Message and the owner panel; anything guessable from the name (Noclip, Fullbright, WalkSpeed) is untouched, so a row with an explanation looks like a row that has one. The mark sits where the label ends, measured with TextService, and above the row's own hit area so a toggle's transparent button does not swallow the hover. A.help(name, text) is public and a row that is not on this shelf is a no-op. 72 moves the badge into place on the next frame as well, since a row built into a page that has not been laid out yet is still zero wide when it is decorated.",
   "loader": "main.lua"
 }

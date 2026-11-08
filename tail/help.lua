@@ -112,16 +112,27 @@ function A.help(name, text)
 		return TextService:GetTextSize(lbl.Text, lbl.TextSize, lbl.Font, Vector2.new(2000, 40)).X
 	end)
 	local textW = okSize and w or 0
-	local bx = (lbl.Position.X.Offset or 0) + textW + 7
-	bx = math.clamp(bx, 0, math.max(0, row.AbsoluteSize.X - 70))
 
 	local badge = new("TextLabel", {
 		Name = "helpBadge", Text = "?", Font = FONT.bold, TextSize = 10,
 		TextColor3 = T.muted, BackgroundColor3 = T.stroke, BackgroundTransparency = 0.35,
 		BorderSizePixel = 0, AnchorPoint = Vector2.new(0, 0.5),
-		Position = UDim2.new(0, bx, 0.5, 0), Size = UDim2.fromOffset(13, 13),
+		Position = UDim2.new(0, 0, 0.5, 0), Size = UDim2.fromOffset(13, 13),
 		ZIndex = 10, Parent = row,
 	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+
+	-- Measured against the row's laid-out width, which is not necessarily known on
+	-- the frame the row is built; the deferred pass fixes anything that landed at
+	-- the left edge because the row was still 0 wide.
+	local function placeBadge()
+		if not badge.Parent then return end
+		local rw = row.AbsoluteSize.X
+		local x = (lbl.Position.X.Offset or 0) + textW + 7
+		if rw > 100 then x = math.clamp(x, 0, rw - 70) end
+		badge.Position = UDim2.new(0, math.max(0, x), 0.5, 0)
+	end
+	placeBadge()
+	task.defer(placeBadge)
 
 	badge.MouseEnter:Connect(function()
 		badge.BackgroundColor3 = T.accent
