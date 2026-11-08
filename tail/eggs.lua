@@ -107,7 +107,7 @@ if A.searchBox then
 	onCleanup(function() searchConn:Disconnect() end)
 end
 
--- 5. the switch ------------------------------------------------------------
+-- 4. the switch ------------------------------------------------------------
 -- widgets.lua counts rapid flips of the same toggle and calls this on the ninth.
 -- Nothing is broken; it is just being watched.
 A.onFlipAbuse = function(name, value)
@@ -115,7 +115,7 @@ A.onFlipAbuse = function(name, value)
 		tostring(name), value and "on" or "off"), "info")
 end
 
--- 6. the waiting -----------------------------------------------------------
+-- 5. the waiting -----------------------------------------------------------
 -- The panel has an opinion about being left open. Two opinions, in fact, and
 -- only when nothing at all has been pressed - not the mouse, not a key.
 local idleAt = os.clock()
@@ -139,7 +139,7 @@ task.spawn(function()
 	end
 end)
 
--- 7. the field -------------------------------------------------------------
+-- 6. the field -------------------------------------------------------------
 -- One word, answered literally. It has to be the whole of the box, so nobody
 -- typing a real query ever trips it.
 local saidNo = false
@@ -157,7 +157,7 @@ if A.searchBox then
 	onCleanup(function() noConn:Disconnect() end)
 end
 
--- 8. the clock -------------------------------------------------------------
+-- 7. the clock -------------------------------------------------------------
 -- One minute a day, at 04:20 local time, the panel says so. Once, and only on a
 -- client that happens to load in that minute.
 task.spawn(function()

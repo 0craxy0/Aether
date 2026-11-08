@@ -1,6 +1,6 @@
 {
-  "rev": 59,
-  "build": "2026-11-08.59",
-  "notes": "Still not listing them. Two more words answer if you type them with no text box focused, one of them rudely; a toggle that gets flipped nine times in a row now comments on it; leaving the panel untouched for ten and then twenty minutes earns two remarks; the search box answers 'no' literally; and there are five more commands that are not in the output of ;cmds, which itself now ends on a hedge. Every one is a notification or a colour - no setting changes, no module is touched, nothing leaves the client.",
+  "rev": 60,
+  "build": "2026-11-08.60",
+  "notes": "Still not listing them. (Comment numbering in tail/eggs.lua fixed; nothing else in this build differs from 59.) Two more words answer if you type them with no text box focused, one of them rudely; a toggle that gets flipped nine times in a row now comments on it; leaving the panel untouched for ten and then twenty minutes earns two remarks; the search box answers 'no' literally; and there are five more commands that are not in the output of ;cmds, which itself now ends on a hedge. Every one is a notification or a colour - no setting changes, no module is touched, nothing leaves the client.",
   "loader": "main.lua"
 }
