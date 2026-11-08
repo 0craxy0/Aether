@@ -18,6 +18,7 @@ if not A.LP or A.LP.UserId ~= ADMIN_ID then return end
 
 local T, FONT = A.T, A.FONT
 local new, label, tween, button = A.new, A.label, A.tween, A.button
+local toggle = A.toggle
 local makePage = A.makePage
 
 local pAdmin = makePage("Admin", 9)
