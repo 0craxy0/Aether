@@ -55,9 +55,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-08.43"
+local BUILD = "2026-11-08.44"
 -- monotonic: the updater compares rev, never the date string
-local REV = 43
+local REV = 44
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -314,11 +314,11 @@ local function fail(msg)
 end
 
 -- No fetch is waited on forever -----------------------------------------------
--- A load is forty small files fetched one after another, and every one of them is
--- a network request. A request that never answers is the one failure mode that
--- looks exactly like a dead game: the card stops mid-load and nothing happens
--- again, because the loader thread is still inside HttpGet. That is not a freeze
--- we can cancel - but we can refuse to be the thread that waits for it.
+-- A load is forty small files, each one a network request. A request that never
+-- answers is the one failure mode that looks exactly like a dead game: the card
+-- stops mid-load and nothing happens again, because the loader thread is still
+-- inside HttpGet. That is not a freeze we can cancel - but we can refuse to be
+-- the thread that waits for it.
 --
 -- So each file is fetched on a thread of its own and the loader polls it with a
 -- deadline. A file that misses the deadline is abandoned (it finishes or it does
@@ -329,7 +329,6 @@ end
 local FETCH_TIMEOUT = 8   -- seconds one file may take before it is abandoned
 local RETRY_TIMEOUT = 15  -- a cold DNS lookup or a dropped first packet deserves more
 local BUDGET = 90         -- the whole load; past this we stop and say so
-
 local CACHE_ROOT = "Aether/cache/" .. tostring(REV) .. "/"
 local cacheReady = false
 local cacheUsable = type(writefile) == "function" and type(readfile) == "function"
@@ -377,14 +376,71 @@ local function fetchTimed(path, timeout)
 		end
 		done = true
 	end)
-	local until_ = os.time() + timeout
-	while not done and os.time() < until_ do task.wait(0.05) end
+	-- os.clock, not os.time: the latter counts whole seconds, so an 8s deadline
+	-- was really "somewhere between 8 and 9" and a fast load could not be timed
+	-- at all - the stall readout below had the same one-second floor
+	local until_ = os.clock() + timeout
+	while not done and os.clock() < until_ do task.wait(0.03) end
 	if done and type(src) == "string" then return src end
 	return nil, why or ("no answer in " .. tostring(timeout) .. "s")
 end
 
+-- Downloads overlap, execution does not ---------------------------------------
+-- Fetched strictly in turn, a load costs the sum of forty round trips; nothing
+-- about that is required, because it is the *execution* order that has the
+-- dependencies, not the downloads. A small pool starts every file this shelf
+-- needs as soon as the load begins, and the sequential loop below picks each
+-- answer up as it reaches it. In turn that was ~40 x 120ms; overlapped it is
+-- ~10 x 120ms, and the files still run in exactly the order FILES lists them.
+local POOL = 4 -- in flight at once; the raw endpoint starts refusing past ~8
+
+local prefetch, queue, qnext = {}, {}, 0
+
+-- Takes the list of paths the shelf actually needs, rather than reading FILES and
+-- calling loadsWith itself: loadsWith is declared further down, and a local is
+-- only in scope below its own declaration, so reaching for it here would have
+-- resolved to a nil global the moment this ran.
+local function prefetchStart(paths)
+	for _, path in ipairs(paths) do
+		prefetch[path] = { done = false }
+		queue[#queue + 1] = path
+	end
+	for _ = 1, math.min(POOL, #queue) do
+		task.spawn(function()
+			while true do
+				qnext += 1
+				local path = queue[qnext]
+				if not path then return end
+				local slot = prefetch[path]
+				local ok, res = pcall(game.HttpGet, game, url(path))
+				if ok and type(res) == "string" then
+					slot.src = res
+				else
+					slot.why = ok and "not a text response" or tostring(res)
+				end
+				slot.done = true
+			end
+		end)
+	end
+end
+
+-- The deadline is wall time from the moment the loader asks, not from when a
+-- worker picked the file up: a pool that has wedged must fail here and fall
+-- through to the retry below, never hang the load waiting for a request that is
+-- still sitting in the queue.
+local function awaitSlot(path, timeout)
+	local slot = prefetch[path]
+	if not slot then return nil, "not queued" end
+	local until_ = os.clock() + timeout
+	while not slot.done do
+		if os.clock() > until_ then return nil, "no answer in " .. tostring(timeout) .. "s" end
+		task.wait(0.03)
+	end
+	return slot.src, slot.why
+end
+
 local function fetch(path)
-	local src, why = fetchTimed(path, FETCH_TIMEOUT)
+	local src, why = awaitSlot(path, FETCH_TIMEOUT)
 	if not src then
 		-- a second chance, not the same request again: the first one may have been
 		-- a cold connection that is now warm
@@ -393,7 +449,9 @@ local function fetch(path)
 	if src then
 		if #src > MAX_BYTES then return nil, string.format("response too large (%d bytes)", #src) end
 		if #src == 0 then return nil, "empty response" end
-		cacheWrite(path, src)
+		-- written off the load thread: forty synchronous disk writes in the middle
+		-- of the critical path cost more than the bytes are worth
+		task.spawn(cacheWrite, path, src)
 		return src
 	end
 	local cached = cacheRead(path)
@@ -414,32 +472,51 @@ local function loadsWith(group)
 	return detectProfile(A.place) == group
 end
 
-local loadStart = os.time()
+-- One filtered list drives both the prefetch and the execution, so the two can
+-- never disagree about what this shelf loads - and the order is still FILES order.
+local loadPaths = {}
 for _, entry in ipairs(FILES) do
-	local path, group = entry[1], entry[2]
-	if loadsWith(group) then
-		if os.time() - loadStart > BUDGET then
-			return fail("network too slow · gave up before " .. path)
-		end
-		local began = os.time()
-		local src, why = fetch(path)
-		local spent = os.time() - began
-		-- a stall is shown, not hidden: "it froze" and "that file is slow" should not
-		-- look the same, and the card is the only place the user can see the second
-		if spent >= 3 and loading then
-			pcall(loading.set, stageCount, string.format("%s · %ds", path, spent))
-		end
-		if not src then
-			return fail("could not download " .. path .. ": " .. tostring(why))
-		end
-		local fn, compileErr = loadstring(src, "@" .. path)
-		if not fn then
-			return fail("syntax error in " .. path .. ": " .. tostring(compileErr))
-		end
-		local okRun, runErr = pcall(fn, A)
-		if not okRun then
-			return fail("error in " .. path .. ": " .. tostring(runErr))
-		end
+	if loadsWith(entry[2]) then loadPaths[#loadPaths + 1] = entry[1] end
+end
+
+local loadStart = os.clock()
+-- folder prep happens here, on this thread, so the cache writes spawned below
+-- cannot race each other into a directory that does not exist yet
+cachePrepare()
+prefetchStart(loadPaths) -- everything this shelf needs is already in flight
+local lastYield = os.clock()
+for _, path in ipairs(loadPaths) do
+	if os.clock() - loadStart > BUDGET then
+		return fail("network too slow · gave up before " .. path)
+	end
+	local began = os.clock()
+	local src, why = fetch(path)
+	local spent = os.clock() - began
+	-- a stall is shown, not hidden: "it froze" and "that file is slow" should not
+	-- look the same, and the card is the only place the user can see the second
+	if spent >= 1.5 and loading then
+		pcall(loading.set, stageCount, string.format("%s · %.1fs", path, spent))
+	end
+	if not src then
+		return fail("could not download " .. path .. ": " .. tostring(why))
+	end
+	local fn, compileErr = loadstring(src, "@" .. path)
+	if not fn then
+		return fail("syntax error in " .. path .. ": " .. tostring(compileErr))
+	end
+	local okRun, runErr = pcall(fn, A)
+	if not okRun then
+		return fail("error in " .. path .. ": " .. tostring(runErr))
+	end
+	-- The load used to yield on every HttpGet, which is what gave the engine a
+	-- frame to repaint the card. Nothing blocks now that the answers are already
+	-- in hand, so the loop has to hand control back itself or forty files compile
+	-- and run in one uninterrupted frame and the card sits frozen at "1 / 15".
+	-- Time-based rather than every file: 30ms of work per frame is invisible, and
+	-- a fast shelf pays for two or three yields instead of forty.
+	if os.clock() - lastYield > 0.03 then
+		lastYield = os.clock()
+		task.wait()
 	end
 end
 
@@ -447,4 +524,10 @@ end
 -- leave the bar one short forever on a non-owner client, where tail/admin.lua
 -- returns before it can announce itself. A.afterLoad is tail/startup.lua's
 -- reveal, so the panel's first frame happens after this card is gone.
+A.loadMs = math.floor((os.clock() - loadStart) * 1000 + 0.5)
+A.filesLoaded = #queue
+if getgenv and getgenv().AetherDebug then
+	print(string.format("[Aether] %d files fetched, compiled and run in %d ms (prefetch pool %d)",
+		#queue, A.loadMs, POOL))
+end
 if loading then pcall(loading.done, A.afterLoad) end

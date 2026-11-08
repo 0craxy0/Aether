@@ -102,6 +102,21 @@ on a slope). Both live in `modules/tesla.lua`'s drive step.
 repaints it from `A.stage`. It reads `7 / 15 loaded Â· keybind overlay` with the
 build number underneath, so a slow executor is visibly slow rather than frozen.
 
+- **downloads overlap, execution does not.** It is the *execution* order that has
+  dependencies, not the downloads, so a pool of four requests starts every file
+  this shelf needs as soon as the load begins and the sequential loop picks each
+  answer up as it reaches it. In turn that was the sum of forty round trips;
+  overlapped it is roughly a quarter of that, and the files still run in exactly
+  the order `FILES` lists them. A slot that misses its deadline falls through to
+  a direct retry and then to that build's cached copy, exactly as before.
+- **the cache is written off the load thread.** Forty synchronous `writefile`
+  calls sat in the middle of the critical path for no benefit; they are spawned
+  now, so a load never waits on the disk.
+- **the first page's entrance plays when it can be seen.** `selectPage` used to
+  run the full row stagger while the loading card still covered the screen, so
+  the animation was spent invisibly and the panel's first frame was already
+  settled. It now rests the page and `A.enterActive` plays the entrance from
+  `show()`, once the card is gone.
 - the 15 stages are declared in one `PLAN` table in `main.lua`, in the order they
   are emitted (which is not the order of `FILES` - `hud` fires before `settings`,
   `tts` after it). Everything else in the loader calls `A.stage(label)`, so a

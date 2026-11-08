@@ -1,6 +1,6 @@
 {
-  "rev": 43,
-  "build": "2026-11-08.43",
-  "notes": "A window you resize now stays resized: the size is saved with the rest of the config, and opening a module's gear menu no longer snaps the panel back to 580x430. Load config now rebuilds the pages that are drawn from it (saved Tesla spots). Cursor magnetism puts a leaning control back when you switch it off mid-hover. Section headings carry a hairline, the window edge is a gradient rim, and the cold-gas keybind shows up in the keybind overlay.",
+  "rev": 44,
+  "build": "2026-11-08.44",
+  "notes": "Startup is faster: the loader now downloads in a pool of four while still compiling and running the files strictly in order, so the load is no longer the sum of forty round trips; the per-build cache is written off the load thread; and the first page's entrance animation plays when the panel is actually visible instead of behind the loading card. Deadlines use os.clock now, so the stall readout is accurate. getgenv().AetherDebug prints the load time in ms.",
   "loader": "main.lua"
 }
