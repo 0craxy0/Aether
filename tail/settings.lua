@@ -86,6 +86,11 @@ function A.loadConfig()
 	if type(data.__extra) == "table" then
 		for k, v in pairs(data.__extra) do A.extra[k] = v end
 	end
+	-- Pages whose rows are built from the config (saved Tesla spots, the profile
+	-- list) were drawn before this file was read, so they still show the previous
+	-- session's rows. Replaying a config without telling them is why "Load config"
+	-- looked like it half-worked.
+	if A.refreshPages then pcall(A.refreshPages) end
 	return true
 end
 

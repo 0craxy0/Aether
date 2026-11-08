@@ -6,6 +6,9 @@ local UserInputService, RunService, onCleanup = A.UserInputService, A.RunService
 KB.binds["Noclip"] = "Toggle noclip"
 KB.binds["Player ESP"] = "Toggle ESP"
 KB.binds["Fullbright"] = "Toggle fullbright"
+-- Tesla shelf only: without this the cold-gas row appeared in the overlay with
+-- no key next to it, because the module had no entry pointing at its bind row
+KB.binds["Infinite cold gas"] = "Toggle cold gas"
 
 local pKeys = A.makePage("Keybinds", 7)
 local sKeys = pKeys.section("Modules", 1)
