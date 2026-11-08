@@ -70,9 +70,29 @@ local function summarise(args, count)
 	return table.concat(bits, ", ")
 end
 
+-- Noise: an engine/audio script can fire dozens of calls a second, and a window
+-- full of them hides the two lines that matter. These are dropped before they are
+-- recorded, and the count of what was dropped is reported instead.
+local NOISE = { "sound", "smeers", "ac6", "particle", "light", "camera", "anim", "tween", "effect" }
+local skipped = 0
+
+local function noisy(name)
+	local n = tostring(name):lower()
+	for _, k in ipairs(NOISE) do
+		if n:find(k, 1, true) then return true end
+	end
+	return false
+end
+
 local function record(dir, name, args, count)
-	calls[#calls + 1] = { t = now(), dir = dir, name = tostring(name), args = summarise(args, count) }
+	if noisy(name) then
+		skipped = skipped + 1
+		return nil
+	end
+	local entry = { t = now(), dir = dir, name = tostring(name), args = summarise(args, count) }
+	calls[#calls + 1] = entry
 	while #calls > CFG.keep do table.remove(calls, 1) end
+	return entry
 end
 
 local interesting = {
@@ -102,9 +122,9 @@ pcall(function()
 		local method = getnamecallmethod()
 		if method == "FireServer" or method == "InvokeServer" then
 			local n = select("#", ...)
-			record("→", self.Name, { ... }, n)
-			if looksInteresting(self.Name) then
-				print(string.format("[MoneyHook] → %s(%s)", self.Name, calls[#calls].args))
+			local entry = record("→", self.Name, { ... }, n)
+			if entry and looksInteresting(self.Name) then
+				print(string.format("[MoneyHook] → %s(%s)", self.Name, entry.args))
 			end
 		end
 		return old(self, ...)
@@ -123,9 +143,9 @@ do
 				watched = watched + 1
 				inst.OnClientEvent:Connect(function(...)
 					local n = select("#", ...)
-					record("←", inst.Name, { ... }, n)
-					if looksInteresting(inst.Name) then
-						print(string.format("[MoneyHook] ← %s(%s)", inst.Name, calls[#calls].args))
+					local entry = record("←", inst.Name, { ... }, n)
+					if entry and looksInteresting(inst.Name) then
+						print(string.format("[MoneyHook] ← %s(%s)", inst.Name, entry.args))
 					end
 				end)
 			end
@@ -152,8 +172,20 @@ local function explain(delta, from, to)
 		return
 	end
 	print(head)
-	for i = 1, math.min(#recent, CFG.maxPrint) do
-		print(string.format("      %s %s(%s)", recent[i].dir, recent[i].name, recent[i].args))
+	-- identical calls collapse: "→ Foo(1) ×9" is one line, not nine
+	local seenOrder, counts = {}, {}
+	for _, c in ipairs(recent) do
+		local key = c.dir .. " " .. c.name .. "(" .. c.args .. ")"
+		if not counts[key] then
+			counts[key] = 0
+			seenOrder[#seenOrder + 1] = key
+		end
+		counts[key] = counts[key] + 1
+	end
+	for i = 1, math.min(#seenOrder, CFG.maxPrint) do
+		local key = seenOrder[i]
+		local n = counts[key]
+		print("      " .. key .. (n > 1 and ("  ×" .. n) or ""))
 	end
 end
 
