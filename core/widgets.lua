@@ -345,7 +345,9 @@ function A.input(parent, name, placeholder, onCommit, defaultText)
 		end
 	end
 	box.FocusLost:Connect(commit)
-	box.FocusGained:Connect(function()
+	-- TextBox fires Focused / FocusLost. There is no FocusGained: the pair is not
+	-- symmetric, which is how this got past a read-through.
+	box.Focused:Connect(function()
 		tween(box, 0.12, { BackgroundTransparency = 0 })
 		stroke.Color = T.accent
 		stroke.Transparency = 0

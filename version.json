@@ -1,6 +1,6 @@
 {
-  "rev": 51,
-  "build": "2026-11-08.51",
-  "notes": "The new text row passed its TextBox as the third argument to new(), which is the child list, so ipairs was handed an Instance and the Movement page died on build. Fixed - the stroke is parented through its props now. new() also accepts a single Instance in that position instead of raising about tables, since every occurrence of this mistake looks the same from the outside: a page failing on a line in core/util.lua that names nothing useful.",
+  "rev": 52,
+  "build": "2026-11-08.52",
+  "notes": "TextBox fires Focused, not FocusGained - the pair is not symmetric with FocusLost, and the new text row was listening for the one that does not exist, so it raised on build. The focus ring works now: the field brightens and its stroke takes the accent while it has focus, and both go back on FocusLost.",
   "loader": "main.lua"
 }
