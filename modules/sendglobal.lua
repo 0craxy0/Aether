@@ -25,10 +25,31 @@ local charParts = A.charParts
 -- Cash lives in leaderstats.Cash; SG.cash() reads any numeric leaderstat or
 -- player attribute whose name looks like a currency, so a rename does not break
 -- the payout check.
+--
+-- Every tier has a cooldown between payouts, and it is waited out rather than
+-- attempted around: a refusal on a cooling pad is a cooldown, not a failure, so
+-- it must not count toward the miss limit that stops the farm. readyAt plus
+-- SG.ready() is the whole mechanism - no attempt is sent at a pad that is known
+-- to be cooling.
+--
+--   tier        pays   cooldown   pays per second (cooldown + ~0.9s overhead)
+--   Easy         100     2s         ~34
+--   Medium       200     3s         ~51
+--   Hard         350     5s         ~59
+--   Nightmare    550     8s         ~62
+--   Insane       750    10s         ~69
+--
+-- Insane is still the best rate even with the longest cooldown, which is why
+-- Auto settles on it; the ladder above is what makes that true rather than
+-- assumed. Cooldowns are per tier, not per player, so nothing here needs the
+-- player to swap servers between payouts.
 
 local SG = {
 	tiers = { "Easy", "Medium", "Hard", "Nightmare", "Insane" },
 	pays = { Easy = 100, Medium = 200, Hard = 350, Nightmare = 550, Insane = 750 },
+	-- seconds a tier refuses to pay again after it has paid (measured in game)
+	cooldowns = { Easy = 2, Medium = 3, Hard = 5, Nightmare = 8, Insane = 10 },
+	pad = 0,           -- extra seconds added to every cooldown, if the server is stricter
 
 	tier = "Auto",     -- what to farm; "Auto" uses the highest tier seen paying
 	interval = 0.9,    -- seconds between attempts
@@ -38,11 +59,31 @@ local SG = {
 	earned = 0,
 	last = nil,        -- human-readable result of the last attempt
 	unlocked = nil,    -- highest tier index known to pay (1..5), nil = unknown
+	readyAt = {},      -- tier -> os.clock() it is payable again
 	pads = {},
 	padsReady = false,
 	cashPath = nil,
 }
 A.SG = SG
+
+-- cooldown -------------------------------------------------------------------
+
+-- What a tier's cooldown is, including the user's padding. One accessor so the
+-- farm, detect() and the page can never disagree about it.
+function SG.coolFor(tier)
+	return (SG.cooldowns[tier] or 0) + (SG.pad or 0)
+end
+
+function SG.ready(tier)
+	local at = SG.readyAt[tier]
+	if not at then return 0 end
+	local left = at - os.clock()
+	if left <= 0 then
+		SG.readyAt[tier] = nil
+		return 0
+	end
+	return left
+end
 
 -- pads -----------------------------------------------------------------------
 
@@ -154,6 +195,8 @@ function SG.tryTier(tier, timeout)
 	local entry = padFor(tier)
 	if not entry then return false, 0, "unknown tier" end
 	if not entry.pos then return false, 0, "WinPad not found" end
+	local cooling = SG.ready(tier)
+	if cooling > 0 then return false, 0, string.format("cooling %.1fs", cooling) end
 
 	local before = SG.cash()
 	local ok, why = stand(entry.pos)
@@ -179,9 +222,16 @@ function SG.detect()
 	SG.resolve()
 	local best, results = nil, {}
 	for i, tier in ipairs(SG.tiers) do
+		-- A cooling pad reads as "not unlocked", which is the one wrong answer
+		-- detect() must not give, so its cooldown is waited out first.
+		local cooling = SG.ready(tier)
+		if cooling > 0 then task.wait(cooling + 0.05) end
 		local ok, delta = SG.tryTier(tier, 2)
 		results[#results + 1] = { tier = tier, ok = ok, delta = delta }
-		if ok then best = i end
+		if ok then
+			best = i
+			SG.readyAt[tier] = os.clock() + SG.coolFor(tier)
+		end
 		task.wait(SG.interval)
 	end
 	SG.unlocked = best
@@ -225,15 +275,32 @@ function SG.start()
 			if tier == "Auto" then
 				tier = SG.unlocked and SG.tiers[SG.unlocked] or SG.tiers[1]
 			end
+
+			-- Cooling is not a failure, and it must not spend an attempt: sleep it
+			-- out in slices so the switch still turns off promptly.
+			local cooling = SG.ready(tier)
+			if cooling > 0 then
+				SG.last = string.format("%s · cooling %.1fs", tier, cooling)
+				task.wait(math.min(cooling, 0.5))
+				continue
+			end
+
 			local ok, delta = SG.tryTier(tier, 2)
 			SG.attempts += 1
 			if ok then
 				misses = 0
 				SG.earned += delta
+				SG.readyAt[tier] = os.clock() + SG.coolFor(tier)
 				SG.last = string.format("%s  +%d", tier, delta)
 			else
 				misses += 1
 				SG.last = tier .. " · no payout"
+				-- A pad that refused is more likely cooling than broken. Honour the
+				-- cooldown so the retry comes at the rate the game allows instead of
+				-- three fast failures that stop the farm.
+				if SG.coolFor(tier) > 0 then
+					SG.readyAt[tier] = os.clock() + SG.coolFor(tier)
+				end
 				if misses >= 3 then
 					-- three quiet attempts: the pad moved, the game stopped paying,
 					-- or the tier is locked. Stop rather than hammer it forever.

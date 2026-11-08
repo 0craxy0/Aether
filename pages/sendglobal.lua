@@ -24,6 +24,15 @@ slider(sFarm, "Attempt interval (ms)", 300, 5000, 900, function(v)
 	SG.interval = v / 1000
 end)
 
+-- The ladder (Easy 2s, Medium 3s, Hard 5s, Nightmare 8s, Insane 10s) is measured
+-- in game and lives in SG.cooldowns. This pads all of them, for a server that
+-- turns out to be stricter than the measurement - a cooldown that is too short
+-- costs one refusal, one that is too long costs throughput, and guessing high is
+-- the safe direction.
+slider(sFarm, "Cooldown padding (s)", 0, 10, 0, function(v)
+	SG.pad = v
+end)
+
 -- The character is placed this far above the pad centre. The pads sit in the
 -- floor, so 0-1 studs is usually right; the slider exists because a pad that
 -- does not register is the one thing that cannot be fixed from code.
@@ -69,7 +78,7 @@ local function rebuild()
 		row.Name = "padRow"
 		row.LayoutOrder = i
 		label({
-			Text = string.format("%s  ·  %d cash", p.tier, SG.pays[p.tier] or 0),
+			Text = string.format("%s  ·  %d cash  ·  %ds cooldown", p.tier, SG.pays[p.tier] or 0, math.floor(SG.coolFor(p.tier))),
 			Font = FONT.med, TextSize = 12,
 			Position = UDim2.fromOffset(11, 4), Size = UDim2.new(1, -80, 0, 16), Parent = row,
 		})
@@ -124,12 +133,18 @@ task.spawn(function()
 		task.wait(0.4)
 		if A.activeTab == PAGE and statusLbl.Parent then
 			local cash = SG.cash()
+			local cooling = {}
+			for _, tier in ipairs(SG.tiers) do
+				local left = SG.ready(tier)
+				if left > 0 then cooling[#cooling + 1] = string.format("%s %.1fs", tier, left) end
+			end
 			local bits = {
 				string.format("cash: %s%s", cash and tostring(cash) or "?",
 					SG.cashPath and (" (" .. SG.cashPath .. ")") or ""),
 				string.format("farm: %s · %d attempts · +%d", SG.on and "ON" or "off", SG.attempts, SG.earned),
 				"last: " .. tostring(SG.last or "-"),
 				string.format("unlocked: %s", SG.unlocked and SG.tiers[SG.unlocked] or "unknown"),
+				"cooling: " .. (#cooling > 0 and table.concat(cooling, " · ") or "none"),
 			}
 			statusLbl.Text = table.concat(bits, "\n")
 		end

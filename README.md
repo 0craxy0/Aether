@@ -108,13 +108,26 @@ WinPad you have not unlocked bounces you back to the previous tier's start.
 **Touching a WinPad is enough to be paid**, which is what makes the farm possible:
 the module stands on the pad rather than running the obby.
 
-| tier | pays | pad |
-|---|---|---|
-| Easy | 100 | `Map.Obbies.Easy.WinPad` |
-| Medium | 200 | `Map.Obbies.Medium.WinPad` |
-| Hard | 350 | `Map.Obbies.Hard.WinPad` |
-| Nightmare | 550 | `Map.Obbies.Nightmare.WinPad` |
-| Insane | 750 | `Map.Obbies.Insane.WinPad` |
+| tier | pays | cooldown | pad |
+|---|---|---|---|
+| Easy | 100 | 2s | `Map.Obbies.Easy.WinPad` |
+| Medium | 200 | 3s | `Map.Obbies.Medium.WinPad` |
+| Hard | 350 | 5s | `Map.Obbies.Hard.WinPad` |
+| Nightmare | 550 | 8s | `Map.Obbies.Nightmare.WinPad` |
+| Insane | 750 | 10s | `Map.Obbies.Insane.WinPad` |
+
+**Cooldowns are per tier and are waited out, not attempted around.** A pad that
+refuses is cooling, not broken, so a refusal never counts toward the three misses
+that stop the farm: it sets that tier's `readyAt` and the loop sleeps until then,
+in half-second slices so the switch still turns off promptly. Nothing is sent at
+a pad that is known to be cooling, and the status block shows the countdown.
+
+The ladder also decides what *Auto* picks. Cash per second including the cooldown
+and the ~0.9s attempt overhead - 34 / 51 / 59 / 62 / 69 from Easy to Insane - is
+what makes Insane the right target even with the longest cooldown, rather than
+assuming the biggest number wins. `Cooldown padding (s)` adds to all five, for a
+server that turns out to be stricter than measured; guessing high costs
+throughput, guessing low costs a refusal.
 
 Those six numbers a side (payout and counter) come from `tools/padlog.lua` on a
 live run; the pads themselves are looked up **by instance** on every attempt, not

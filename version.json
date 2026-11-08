@@ -1,6 +1,6 @@
 {
-  "rev": 45,
-  "build": "2026-11-08.45",
-  "notes": "Send a Global Message gets a shelf. Touching a tier's WinPad is what pays, so the new page stands on the pad instead of running the obby: Easy 100, Medium 200, Hard 350, Nightmare 550, Insane 750, read from leaderstats.Cash. Tiers unlock in order and a locked pad bounces you back, so Auto touches each pad once from Easy up, keeps the highest one that paid, and farms that; three quiet attempts stop the loop instead of hammering a pad that moved. Pads are resolved by instance (Map.Obbies.<tier>.WinPad), not by coordinate, and the place is recognised under both 10164995980 and 118282960139128. tools/padlog.lua is the probe that produced those numbers.",
+  "rev": 46,
+  "build": "2026-11-08.46",
+  "notes": "Send a Global Message: every tier has a cooldown between payouts - Easy 2s, Medium 3s, Hard 5s, Nightmare 8s, Insane 10s - and the farm now waits them out instead of counting them as failures. A refusal on a cooling pad sets that tier's readyAt and the loop sleeps until it expires, so three fast misses can no longer stop a farm that was only waiting; the status block shows the countdown, the pad list shows each cooldown, and a Cooldown padding slider covers a server that is stricter than measured. Insane still wins on cash per second (69 vs 62 for Nightmare), so Auto still settles there.",
   "loader": "main.lua"
 }
