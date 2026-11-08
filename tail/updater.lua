@@ -347,7 +347,9 @@ function U.rollback(text)
 	local sha, why = resolveTarget(text)
 	if not sha then return false, why end
 	A.extra.pinCommit = sha
-	A.extra.pinRev = tonumber(tostring(text):gsub("%s+", "")) or nil
+	-- the extra parens are load-bearing: gsub returns (string, count), and
+	-- passing that straight to tonumber hands it the count as a base
+	A.extra.pinRev = tonumber((tostring(text):gsub("%s+", ""))) or nil
 	local okSave, saved, msg = pcall(A.flushConfig)
 	if not (okSave and saved == true) then
 		A.extra.pinCommit, A.extra.pinRev = nil, nil
