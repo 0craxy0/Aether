@@ -157,6 +157,33 @@ local function aimAt(part)
 	cam.CFrame = CFrame.lookAt(from, to)
 end
 
+local function dumpFolder()
+	local folder = dummyFolder()
+	if not folder then
+		print("[KillAll] no Workspace.Dummies folder")
+		return
+	end
+	local kids = folder:GetChildren()
+	print(string.format("[KillAll] %s · %d child(ren)", folder:GetFullName(), #kids))
+	for i, m in ipairs(kids) do
+		if i > 12 then
+			print("  ...")
+			break
+		end
+		local attrs = {}
+		local okA, a = pcall(function() return m:GetAttributes() end)
+		if okA and type(a) == "table" then
+			for k, v in pairs(a) do attrs[#attrs + 1] = k .. "=" .. tostring(v) end
+		end
+		local keyKids = {}
+		for _, c in ipairs(m:GetChildren()) do
+			if #keyKids < 7 then keyKids[#keyKids + 1] = c.Name .. ":" .. c.ClassName end
+		end
+		print(string.format("  %2d. %-14s %-9s attrs[%s] kids[%s]", i, m.Name:sub(1, 14), m.ClassName,
+			table.concat(attrs, ","), table.concat(keyKids, ",")))
+	end
+end
+
 local function scan()
 	local list = candidates()
 	local where = list.folderFound
@@ -170,9 +197,11 @@ local function scan()
 			t.hum.Health, t.hum.MaxHealth, t.dist, t.folder and "folder" or "Dummy*"))
 	end
 	if #list == 0 then
-		-- nothing matched: print every Humanoid in the place with its parent chain,
-		-- so the hierarchy is visible instead of guessed at
-		print("  (nothing matched - every Humanoid in Workspace follows:)")
+		-- The folder is there but nothing in it answered to Humanoid. Print what is
+		-- actually in it, and what the Humanoids in the place do look like, rather
+		-- than guessing again.
+		dumpFolder()
+		print("  (every Humanoid in Workspace follows:)")
 		local n = 0
 		for _, d in ipairs(Workspace:GetDescendants()) do
 			if d:IsA("Humanoid") then
@@ -265,6 +294,7 @@ end
 
 local module = {
 	scan = scan,
+	dump = dumpFolder,
 	run = run,
 	stop = function() state.running = false end,
 }
