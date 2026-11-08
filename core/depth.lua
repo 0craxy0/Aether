@@ -87,6 +87,9 @@ local function drift(dt)
 end
 
 local conn = RunService.Heartbeat:Connect(function(dt)
+	-- nothing to drift while the panel is behind the hide key
+	local win = A.window
+	if win and not (win.Visible and win.GroupTransparency < 0.98) then return end
 	drift(math.min(dt, 1 / 30))
 end)
 onCleanup(function() conn:Disconnect() end)

@@ -301,6 +301,32 @@ Both guard switches share one `Heartbeat` and one idea of "the current root";
 last position is cleared on `CharacterAdded`, because a respawn legitimately
 starts somewhere else.
 
+## commands
+
+One parser, two doors, same list. `;cmds` prints it.
+
+| door | costs | why |
+|---|---|---|
+| game chat | the command is **public** - the game sends your message before `Player.Chatted` fires, so everyone sees it | it is one line from anywhere |
+| Settings > Commands | nothing leaves the client | use it for anything you would rather not broadcast |
+
+Both are off until you say otherwise: **Chat commands** is a switch, and the field
+runs whatever you type. The prefix is one character and configurable (`;`, `!`,
+`.`), because a game that already owns `;` would otherwise eat every command.
+
+```
+;tp <waypoint|part|player>   ;save <name>   ;wp   ;del <name>
+;find <query>  then  ;go <n>
+;hl <name|off>   ;lowg on|off   ;info
+;fly  ;ws <n>  ;jp <n>  ;infjump  ;noclip  ;anchor  ;unanchor
+;profile <name>  ;profiles   ;panic   ;cmds
+```
+
+Numeric and toggle commands go through the widget that owns the row, not straight
+into the module, so the panel cannot disagree with what the command did - `;ws 45`
+moves the WalkSpeed slider. Nothing here talks to a remote; it is a keyboard in
+front of the hub, not a second hub.
+
 ## read aloud
 
 Off until you say otherwise. A first-run card asks once; a "yes" is remembered

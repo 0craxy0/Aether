@@ -14,6 +14,7 @@ end
 
 local registry = {}      -- search + config index
 local accentLinks = {}   -- objects that repaint on accent change
+local setters = {}       -- toggle name -> its set(), for A.setToggle
 local KB = {
 	active = {}, index = {}, onToggle = function(_name, _v) end,
 	listening = false, -- true while a keybind row is waiting for a key
@@ -130,7 +131,18 @@ function A.toggle(parent, name, default, onChanged)
 		set(true, true)
 		if onChanged then pcall(onChanged, true) end
 	end
+	-- Flips a toggle the way a click would: through set() with onChanged firing,
+	-- which is what a config replay deliberately does not do. tail/commands.lua
+	-- needs that, because ";fly" has to actually start flying.
+	setters[name] = set
 	return { set = set, get = function() return state end, row = r }
+end
+
+function A.setToggle(name, v)
+	local set = setters[name]
+	if not set then return false, "no toggle named " .. tostring(name) end
+	set(v and true or false)
+	return true
 end
 
 -- slider ------------------------------------------------------
@@ -296,18 +308,32 @@ end
 -- keystroke: every caller here does something with the string (a search over
 -- Workspace, a file on disk) and a per-key callback would run both sixty times.
 function A.input(parent, name, placeholder, onCommit, defaultText)
-	local r = rowBase(parent, 40)
-	rowLabel(r, name, name)
+	local r = rowBase(parent, 52)
+	-- Two lines, not one: rowLabel stretches to the full row height and centres
+	-- itself, which is right for a toggle but drew the label straight through the
+	-- middle of the field and on top of its placeholder.
+	label({
+		Text = name, Font = FONT.med, TextSize = 12, TextColor3 = T.text,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(11, 8), Size = UDim2.new(1, -22, 0, 14), Parent = r,
+	})
 	local box = new("TextBox", {
 		Text = tostring(defaultText or ""), PlaceholderText = placeholder or "",
 		PlaceholderColor3 = T.muted, Font = FONT.reg, TextSize = 11, TextColor3 = T.text,
 		BackgroundColor3 = T.panel, BackgroundTransparency = 0.25, BorderSizePixel = 0,
-		TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false,
-		Position = UDim2.fromOffset(11, 18), Size = UDim2.new(1, -22, 0, 18), Parent = r,
+		TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
+		ClearTextOnFocus = false,
+		Position = UDim2.fromOffset(11, 25), Size = UDim2.new(1, -22, 0, 21), Parent = r,
 	}, {
 		new("UICorner", { CornerRadius = UDim.new(0, 5) }),
 		new("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
 	})
+	-- the field is the only part of the row that takes a click, so it is the one
+	-- that has to say "you are typing here" - a focused box is otherwise identical
+	local stroke = new("UIStroke", {
+		Color = T.stroke, Thickness = 1, Transparency = 0.55, ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+	}, box)
+	accentLinks[#accentLinks + 1] = { obj = stroke, kind = "stroke" }
 
 	local function commit()
 		if onCommit then
@@ -316,16 +342,28 @@ function A.input(parent, name, placeholder, onCommit, defaultText)
 		end
 	end
 	box.FocusLost:Connect(commit)
+	box.FocusGained:Connect(function()
+		tween(box, 0.12, { BackgroundTransparency = 0 })
+		stroke.Color = T.accent
+		stroke.Transparency = 0
+	end)
+	box.FocusLost:Connect(function()
+		tween(box, 0.15, { BackgroundTransparency = 0.25 })
+		stroke.Color = T.stroke
+		stroke.Transparency = 0.55
+	end)
 	box.MouseEnter:Connect(function() tween(box, 0.12, { BackgroundTransparency = 0 }) end)
 	box.MouseLeave:Connect(function()
-		if not box:IsFocused() then tween(box, 0.12, { BackgroundTransparency = 0.25 }) end
+		if not box:IsFocused() then tween(box, 0.15, { BackgroundTransparency = 0.25 }) end
 	end)
 
 	register(r, name)
 	return {
 		row = r,
+		box = box,
 		get = function() return box.Text end,
 		set = function(v) box.Text = tostring(v or "") end,
+		focus = function() pcall(function() box:CaptureFocus() end) end,
 	}
 end
 

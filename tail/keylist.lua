@@ -18,12 +18,24 @@ maskGuis[#maskGuis + 1] = kbList
 
 local kbRows = {}
 
+-- Reverse index: bind name -> key. kbKey used to walk every bound key for every
+-- row on every frame, which at 60fps and a full list is hundreds of lookups per
+-- frame to answer a question whose answer changes only when a key is rebound.
+-- Rebuilt at most five times a second, and a rebind is a click away from visible.
+local rev, revAt = nil, 0
+local function reverse()
+	local now = os.clock()
+	if rev and now - revAt < 0.2 then return rev end
+	rev, revAt = {}, now
+	for k, n in pairs(keybinds) do rev[n] = k end
+	return rev
+end
+
 local function kbKey(mod)
 	local bind = KB.binds[mod]
 	if bind then
-		for k, n in pairs(keybinds) do
-			if n == bind then return k end
-		end
+		local k = reverse()[bind]
+		if k then return k end
 	end
 	return "—"
 end
@@ -85,7 +97,16 @@ end
 -- toggles created before this file loaded (default-on ones) get their rows now
 for name in pairs(KB.active) do KB.onToggle(name, true) end
 
-local kbConn = RunService.Heartbeat:Connect(function()
+-- Text assignments are not free and nothing here changes faster than a human can
+-- press a key, so this runs at ~10Hz instead of the frame rate - and not at all
+-- while the panel is hidden behind the toggle, where nobody can read it.
+local kbAcc = 0
+local kbConn = RunService.Heartbeat:Connect(function(dt)
+	local win = A.window
+	if win and not (win.Visible and win.GroupTransparency < 0.98) then return end
+	kbAcc += dt
+	if kbAcc < 0.1 then return end
+	kbAcc = 0
 	for mod, r in pairs(kbRows) do
 		local k = kbKey(mod)
 		if r.box.Text ~= k then r.box.Text = k end

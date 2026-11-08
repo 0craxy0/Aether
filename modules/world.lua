@@ -110,18 +110,40 @@ local function dropAll()
 	W.objects = {}
 end
 
+-- Incremental, not a full rebuild. The old version destroyed and recreated every
+-- Drawing object on every scan, which is a visible hitch in a busy place once a
+-- second and a half. Objects that still qualify keep the set they already have;
+-- only the ones that walked out of range are removed and only genuinely new
+-- matches allocate.
 local function rescan()
-	dropAll()
-	if not W.hl or W.pattern == "" then return end
+	if not W.hl or W.pattern == "" then
+		dropAll()
+		return
+	end
 	local cam = workspace.CurrentCamera
 	if not cam then return end
-	local ok, list = pcall(function() return workspace:GetDescendants() end)
-	if not ok then return end
 	local camPos = cam.CFrame.Position
 	local want = W.pattern:lower()
+
+	local kept, live = {}, {}
+	for _, o in ipairs(W.objects) do
+		local inst = o.inst
+		local p = (inst and inst.Parent) and inst.Position or nil
+		if p and (p - camPos).Magnitude <= W.maxDist then
+			kept[#kept + 1] = o
+			live[inst] = true
+		else
+			for _, d in pairs(o.set) do pcall(function() d:Remove() end) end
+		end
+	end
+	W.objects = kept
+	if #kept >= W.maxObjects then return end
+
+	local ok, list = pcall(function() return workspace:GetDescendants() end)
+	if not ok then return end
 	for _, inst in ipairs(list) do
 		if #W.objects >= W.maxObjects then break end
-		if inst:IsA("BasePart") and inst.Name:lower():find(want, 1, true) then
+		if not live[inst] and inst:IsA("BasePart") and inst.Name:lower():find(want, 1, true) then
 			local p = inst.Position
 			if (p - camPos).Magnitude <= W.maxDist then
 				local set = newSet()
@@ -181,7 +203,14 @@ local drawConn = RunService.RenderStepped:Connect(function()
 			set.box.Size = Vector2.new(size, size)
 			set.box.Color = T.accent
 			set.text.Visible = true
-			set.text.Text = string.format("%s  %dm", inst.Name, math.floor(dist))
+			-- the label only changes when the name does or the distance crosses a
+			-- whole stud; formatting a string per object per frame is the one
+			-- allocation this loop did not need
+			local d = math.floor(dist)
+			if o._n ~= inst.Name or o._d ~= d then
+				o._n, o._d = inst.Name, d
+				set.text.Text = string.format("%s  %dm", inst.Name, d)
+			end
 			set.text.Position = Vector2.new(sp.X, sp.Y + size / 2 + 9)
 			set.text.Color = Color3.new(1, 1, 1)
 			-- Drawing does not clip to the panel, so drop anything that lands on it

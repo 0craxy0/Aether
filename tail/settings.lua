@@ -22,7 +22,10 @@ function A.setAccent(c)
 		if not l.obj.Parent then
 			table.remove(accentLinks, i)
 		else
-			tween(l.obj, 0.25, { [l.kind == "text" and "TextColor3" or "BackgroundColor3"] = c })
+			-- a UIStroke has a Color, not a BackgroundColor3; a text field's focus
+			-- ring is the only one of those, and it must follow the accent too
+			local prop = l.kind == "text" and "TextColor3" or (l.kind == "stroke" and "Color") or "BackgroundColor3"
+			tween(l.obj, 0.25, { [prop] = c })
 		end
 	end
 	if A.activeTab then A.selectPage(A.activeTab) end
@@ -294,5 +297,27 @@ A.onPage(function(name)
 	if name == "Settings" then refreshProfiles() end
 end)
 refreshProfiles()
+
+-- commands ----------------------------------------------------------------------
+-- One parser, two doors. This field is the door that sends nothing anywhere; the
+-- other one is the game's own chat, wired in tail/commands.lua, where typing a
+-- command is a public act. Same list either way: ";cmds" in the console.
+local sCmd = pSet.section("Commands", 6)
+local cmdBox
+cmdBox = input(sCmd, "Run a command", ";tp shop", function(v)
+	if v == "" then return end
+	pcall(A.cmd.line, v)
+	-- cleared on purpose: the field is a prompt, not a history, and a persisted
+	-- command would replay itself the next time config loaded
+	cmdBox.set("")
+end)
+toggle(sCmd, "Chat commands", false, function(v) A.cmd.setEnabled(v) end)
+input(sCmd, "Command prefix", ";", function(v) A.cmd.text(v) end)
+label({
+	Text = "Chat commands read your own chat lines after the game has already sent "
+		.. "them, so everyone in the server sees a command you type there. This field does not.",
+	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+	Size = UDim2.new(1, 0, 0, 32), Parent = sCmd,
+})
 
 A.stage("7 settings page done")

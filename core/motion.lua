@@ -140,10 +140,21 @@ local function settle()
 	end
 end
 
+-- The heartbeat used to run settle() on every frame while magnetism was off,
+-- walking the whole field to find offsets that were already zero. It now runs it
+-- once, on the frame the switch goes off, which is the only frame that matters.
+local leaning = false
 local conn = RunService.Heartbeat:Connect(function(dt)
-	if not (M.enabled and M.magnetOn) then settle(); return end
+	if not (M.enabled and M.magnetOn) then
+		if leaning then
+			leaning = false
+			settle()
+		end
+		return
+	end
 	if #M.items == 0 then return end
 	if not (window.Visible and window.GroupTransparency < 0.98) then return end
+	leaning = true
 	magnetStep(math.min(dt, 1 / 30))
 end)
 onCleanup(function() conn:Disconnect() end)

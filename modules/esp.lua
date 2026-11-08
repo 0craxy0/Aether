@@ -6,13 +6,30 @@ local screen, maskSet = A.screen, A.maskSet
 local ESP = { active = false, conn = nil, objects = {}, chams = {} }
 A.ESP = ESP
 
+-- Per-player character cache. Everything below needs the same three parts of the
+-- same character on every frame, and FindFirstChild walks a tree: caching them
+-- against the model that owns them costs one comparison per frame instead.
+local CACHE = {}
+
+local function forget(plr)
+	CACHE[plr] = nil
+end
+
 local function dropESP(plr)
 	local set = ESP.objects[plr]
 	if not set then return end
 	for _, d in pairs(set) do pcall(function() d:Remove() end) end
 	ESP.objects[plr] = nil
 end
-local dropConn = Players.PlayerRemoving:Connect(dropESP)
+local dropConn = Players.PlayerRemoving:Connect(function(plr)
+	dropESP(plr)
+	forget(plr)
+	local h = ESP.chams[plr]
+	if h then
+		pcall(function() h:Destroy() end)
+		ESP.chams[plr] = nil
+	end
+end)
 onCleanup(function() dropConn:Disconnect() end)
 
 ESP.s = {
@@ -47,12 +64,21 @@ local function killCham(plr)
 	if h then pcall(function() h:Destroy() end) end
 	ESP.chams[plr] = nil
 end
-local chamConn = Players.PlayerRemoving:Connect(killCham)
-onCleanup(function() chamConn:Disconnect() end)
+
+-- Rainbow used to call Color3.fromHSV on every player, every frame, and every
+-- value it produced in one frame was the same one. One colour per frame now.
+local rainbow, rainbowAt = nil, 0
+local function frameColor()
+	local now = tick()
+	if not rainbow or now - rainbowAt >= 1 / 30 then
+		rainbowAt, rainbow = now, Color3.fromHSV(now % 5 / 5, 1, 1)
+	end
+	return rainbow
+end
 
 local function espColor(plr, visible)
 	local m = S.colorMode
-	if m == "Rainbow" then return Color3.fromHSV(tick() % 5 / 5, 1, 1) end
+	if m == "Rainbow" then return frameColor() end
 	if m == "Team" then return plr.Team and plr.TeamColor.Color or T.accent end
 	if m == "Visibility" then return visible and T.good or T.bad end
 	return T.accent
@@ -62,6 +88,17 @@ local function mk(kind, props)
 	local d = Drawing.new(kind)
 	for k, v in pairs(props) do d[k] = v end
 	return d
+end
+
+-- per-set bookkeeping, keyed by the set itself and collected with it
+local flags = setmetatable({}, { __mode = "k" })
+local function fl(set)
+	local f = flags[set]
+	if not f then
+		f = { vis = true, txt = {}, sk = false }
+		flags[set] = f
+	end
+	return f
 end
 
 local function newESPSet()
@@ -78,9 +115,38 @@ local function newESPSet()
 		head = mk("Circle", { Filled = false, Thickness = 1, NumSides = 16 }),
 		arrow = mk("Triangle", { Filled = true }),
 	}
-	for i = 1, 8 do set["c" .. i] = mk("Line", { Thickness = 1 }) end
-	for i = 1, MAX_BONES do set["sk" .. i] = mk("Line", { Thickness = 1 }) end
+	-- No bookkeeping keys inside the set: modules/filter.lua's maskSet walks
+	-- pairs(set) and reads .Visible on everything it finds, so a boolean stashed
+	-- here would be indexed as a Drawing and raise. Per-set flags live beside it.
+	flags[set] = { vis = true, txt = {}, sk = false }
+	for i = 1, 8 do
+		local ln = mk("Line", { Thickness = 1 })
+		ln.Visible = false
+		set["c" .. i] = ln
+	end
+	for i = 1, MAX_BONES do
+		local ln = mk("Line", { Thickness = 1 })
+		ln.Visible = false
+		set["sk" .. i] = ln
+	end
 	return set
+end
+
+local DRAWABLES = {
+	"fill", "boxOut", "box", "name", "info", "hpBg", "hp", "hpText", "tracer", "head", "arrow",
+}
+
+local function hide(set)
+	local f = fl(set)
+	if not f.vis then return end -- already dark; no reason to write 40 properties
+	f.vis = false
+	for _, k in ipairs(DRAWABLES) do set[k].Visible = false end
+	for i = 1, 8 do set["c" .. i].Visible = false end
+	for i = 1, MAX_BONES do set["sk" .. i].Visible = false end
+end
+
+local function show(set)
+	fl(set).vis = true
 end
 
 function ESP.stop()
@@ -92,7 +158,31 @@ function ESP.stop()
 	for plr in pairs(ESP.chams) do chams[#chams + 1] = plr end
 	for _, plr in ipairs(players) do dropESP(plr) end
 	for _, plr in ipairs(chams) do killCham(plr) end
+	CACHE = {}
 	ESP.active = false
+end
+
+-- One character, resolved once per spawn. Returns nil when there is nothing
+-- worth drawing, which is also the cheapest possible answer.
+local function characterOf(plr)
+	local c = plr.Character
+	if not c then return nil end
+	local e = CACHE[plr]
+	if e and e.char == c then return e end
+	local root = c:FindFirstChild("HumanoidRootPart")
+	local hum = c:FindFirstChildOfClass("Humanoid")
+	if not root or not hum then return nil end
+	e = { char = c, root = root, hum = hum, parts = {} }
+	CACHE[plr] = e
+	return e
+end
+
+local function partOf(e, name)
+	local p = e.parts[name]
+	if p and p.Parent == e.char then return p end
+	p = e.char:FindFirstChild(name)
+	e.parts[name] = p
+	return p
 end
 
 function ESP.start()
@@ -100,47 +190,52 @@ function ESP.start()
 	if ESP.conn then return end
 	ESP.active = true
 
-	local function hide(set)
-		for _, d in pairs(set) do d.Visible = false end
-	end
-
 	ESP.conn = RunService.RenderStepped:Connect(function()
 		local cam = workspace.CurrentCamera
 		if not cam then return end
 		local vp = cam.ViewportSize
-		local mouse = UserInputService:GetMouseLocation()
+		local camPos = cam.CFrame.Position
+		local mouse = nil -- fetched only when the tracer actually comes from it
+		local wantRay = S.colorMode == "Visibility"
+		local maxD2 = S.maxDist * S.maxDist
 
 		for _, plr in ipairs(Players:GetPlayers()) do
 			if plr == LP then continue end
+			local e = characterOf(plr)
+			local hidden = not e or e.hum.Health <= 0
+			if not hidden and S.teamCheck and LP.Team ~= nil and plr.Team == LP.Team then
+				hidden = true
+			end
+
+			local root = e and e.root
+			local offset = root and (root.Position - camPos)
+			-- squared first: the square root is only for the label, and only for
+			-- a player who passed the range test
+			local d2 = offset and offset:Dot(offset) or nil
+			if not hidden and d2 and d2 > maxD2 then hidden = true end
+
+			if hidden then
+				local set = ESP.objects[plr]
+				if set then hide(set) end
+				killCham(plr)
+				continue
+			end
+
 			local set = ESP.objects[plr]
 			if not set then
 				set = newESPSet()
 				ESP.objects[plr] = set
 			end
+			show(set)
+			local f = fl(set)
 
-			-- Phantom Forces note: plr.Character is not used there; a shared getChar helper is planned
-			local c = plr.Character
-			local root = c and c:FindFirstChild("HumanoidRootPart")
-			local hum = c and c:FindFirstChildOfClass("Humanoid")
-
-			if not root or not hum or hum.Health <= 0
-				or (S.teamCheck and LP.Team ~= nil and plr.Team == LP.Team) then
-				hide(set)
-				killCham(plr)
-				continue
-			end
-
-			local dist = (root.Position - cam.CFrame.Position).Magnitude
-			if dist > S.maxDist then
-				hide(set)
-				killCham(plr)
-				continue
-			end
+			local c, hum = e.char, e.hum
+			local dist = math.sqrt(d2)
 
 			local visible = false
-			if S.colorMode == "Visibility" then
+			if wantRay then
 				rayParams.FilterDescendantsInstances = { LP.Character, c }
-				visible = workspace:Raycast(cam.CFrame.Position, root.Position - cam.CFrame.Position, rayParams) == nil
+				visible = workspace:Raycast(camPos, offset, rayParams) == nil
 			end
 			local col = espColor(plr, visible)
 
@@ -157,7 +252,7 @@ function ESP.start()
 				end
 				h.Adornee = c
 				h.FillColor = col
-			else
+			elseif ESP.chams[plr] then
 				killCham(plr)
 			end
 
@@ -177,6 +272,9 @@ function ESP.start()
 						set.arrow.PointB = pos - dir * 6 + perp * 8
 						set.arrow.PointC = pos - dir * 6 - perp * 8
 						set.arrow.Color = col
+						-- the arrow is the one thing that survives an off-screen
+						-- frame, so the set counts as lit for the next hide()
+						f.vis = true
 						set.arrow.Visible = true
 						maskSet(set)
 					end
@@ -197,30 +295,39 @@ function ESP.start()
 			set.boxOut.Visible = full
 			set.box.Visible = full
 			if full then
-				set.boxOut.Position = Vector2.new(x, y)
-				set.boxOut.Size = Vector2.new(w, h)
-				set.box.Position = Vector2.new(x, y)
-				set.box.Size = Vector2.new(w, h)
+				local tl = Vector2.new(x, y)
+				local sz = Vector2.new(w, h)
+				set.boxOut.Position = tl
+				set.boxOut.Size = sz
+				set.box.Position = tl
+				set.box.Size = sz
 				set.box.Color = col
 			end
-			local cl, cv = w * 0.28, h * 0.2
-			local segs = {
-				{ x, y, x + cl, y }, { x, y, x, y + cv },
-				{ x + w, y, x + w - cl, y }, { x + w, y, x + w, y + cv },
-				{ x, y + h, x + cl, y + h }, { x, y + h, x, y + h - cv },
-				{ x + w, y + h, x + w - cl, y + h }, { x + w, y + h, x + w, y + h - cv },
-			}
-			for i = 1, 8 do
-				local ln = set["c" .. i]
-				ln.Visible = corners
-				if corners then
-					local sg = segs[i]
+
+			-- corner brackets: eight constant segments, so the table is built once
+			-- per frame only when they are actually on
+			if corners then
+				local cl, cv = w * 0.28, h * 0.2
+				local x2, y2 = x + w, y + h
+				local segs = {
+					{ x, y, x + cl, y }, { x, y, x, y + cv },
+					{ x2, y, x2 - cl, y }, { x2, y, x2, y + cv },
+					{ x, y2, x + cl, y2 }, { x, y2, x, y2 - cv },
+					{ x2, y2, x2 - cl, y2 }, { x2, y2, x2, y2 - cv },
+				}
+				for i = 1, 8 do
+					local ln, sg = set["c" .. i], segs[i]
 					ln.From = Vector2.new(sg[1], sg[2])
 					ln.To = Vector2.new(sg[3], sg[4])
 					ln.Color = col
+					ln.Visible = true
+				end
+			else
+				for i = 1, 8 do
+					local ln = set["c" .. i]
+					if ln.Visible then ln.Visible = false end
 				end
 			end
-
 			set.fill.Visible = S.fill
 			if S.fill then
 				set.fill.Position = Vector2.new(x, y)
@@ -233,21 +340,35 @@ function ESP.start()
 			if S.name then
 				set.name.Size = S.textSize
 				set.name.Position = Vector2.new(cx, y - S.textSize - 3)
-				set.name.Text = plr.DisplayName ~= plr.Name and (plr.DisplayName .. " (@" .. plr.Name .. ")") or plr.Name
+				local label = plr.DisplayName ~= plr.Name and (plr.DisplayName .. " (@" .. plr.Name .. ")") or plr.Name
+				if f.txt.name ~= label then
+					f.txt.name = label
+					set.name.Text = label
+				end
 			end
 
 			-- info line: distance / tool
-			local bits = {}
-			if S.dist then bits[#bits + 1] = math.floor(dist) .. "m" end
+			local bitCount = 0
+			local infoText
+			if S.dist then
+				bitCount = 1
+				infoText = math.floor(dist) .. "m"
+			end
 			if S.tool then
 				local tl = c:FindFirstChildOfClass("Tool")
-				if tl then bits[#bits + 1] = tl.Name end
+				if tl then
+					bitCount = bitCount + 1
+					infoText = infoText and (infoText .. "  ·  " .. tl.Name) or tl.Name
+				end
 			end
-			set.info.Visible = #bits > 0
-			if #bits > 0 then
+			set.info.Visible = bitCount > 0
+			if bitCount > 0 then
 				set.info.Size = math.max(S.textSize - 2, 9)
 				set.info.Position = Vector2.new(cx, y + h + 2)
-				set.info.Text = table.concat(bits, "  ·  ")
+				if f.txt.info ~= infoText then
+					f.txt.info = infoText
+					set.info.Text = infoText
+				end
 			end
 
 			-- health
@@ -265,59 +386,80 @@ function ESP.start()
 			if S.healthText then
 				set.hpText.Size = math.max(S.textSize - 3, 9)
 				set.hpText.Position = Vector2.new(x - 16, math.clamp(y + h * (1 - frac) - 5, y, y + h - 10))
-				set.hpText.Text = tostring(math.floor(hum.Health))
+				local hpText = tostring(math.floor(hum.Health))
+				if f.txt.hp ~= hpText then
+					f.txt.hp = hpText
+					set.hpText.Text = hpText
+				end
 			end
 
 			-- tracer
 			set.tracer.Visible = S.tracer
 			if S.tracer then
 				local o = S.tracerOrigin
-				local from = Vector2.new(vp.X / 2, vp.Y)
-				if o == "Center" then from = vp / 2
-				elseif o == "Top" then from = Vector2.new(vp.X / 2, 0)
-				elseif o == "Mouse" then from = Vector2.new(mouse.X, mouse.Y) end
+				local from
+				if o == "Center" then
+					from = vp / 2
+				elseif o == "Top" then
+					from = Vector2.new(vp.X / 2, 0)
+				elseif o == "Mouse" then
+					mouse = mouse or UserInputService:GetMouseLocation()
+					from = Vector2.new(mouse.X, mouse.Y)
+				else
+					from = Vector2.new(vp.X / 2, vp.Y)
+				end
 				set.tracer.From = from
 				set.tracer.To = Vector2.new(cx, y + h)
 				set.tracer.Color = col
 			end
 
 			-- head dot
-			local headPart = c:FindFirstChild("Head")
-			set.head.Visible = false
-			if S.headDot and headPart then
-				local p, on = cam:WorldToViewportPoint(headPart.Position)
-				if on and p.Z > 0 then
-					set.head.Visible = true
-					set.head.Position = Vector2.new(p.X, p.Y)
-					set.head.Radius = math.max(2, h / 12)
-					set.head.Color = col
-				end
-			end
-
-			-- skeleton
-			local bones = hum.RigType == Enum.HumanoidRigType.R15 and R15_BONES or R6_BONES
-			for i = 1, MAX_BONES do
-				local ln = set["sk" .. i]
-				local shown = false
-				local pair = bones[i]
-				if S.skeleton and pair then
-					local a, b = c:FindFirstChild(pair[1]), c:FindFirstChild(pair[2])
-					if a and b then
-						local pa, oa = cam:WorldToViewportPoint(a.Position)
-						local pb, ob = cam:WorldToViewportPoint(b.Position)
-						if oa and ob and pa.Z > 0 and pb.Z > 0 then
-							ln.From = Vector2.new(pa.X, pa.Y)
-							ln.To = Vector2.new(pb.X, pb.Y)
-							ln.Color = col
-							shown = true
-						end
+			if S.headDot then
+				local headPart = partOf(e, "Head")
+				set.head.Visible = false
+				if headPart then
+					local p, on = cam:WorldToViewportPoint(headPart.Position)
+					if on and p.Z > 0 then
+						set.head.Visible = true
+						set.head.Position = Vector2.new(p.X, p.Y)
+						set.head.Radius = math.max(2, h / 12)
+						set.head.Color = col
 					end
 				end
-				ln.Visible = shown
-				if i == MAX_BONES then maskSet(set) end
+			elseif set.head.Visible then
+				set.head.Visible = false
 			end
+
+			-- skeleton: 14 pairs is 28 FindFirstChild and 28 projections per
+			-- player per frame, so it does not run at all unless it is on
+			if S.skeleton then
+				local bones = hum.RigType == Enum.HumanoidRigType.R15 and R15_BONES or R6_BONES
+				for i = 1, MAX_BONES do
+					local ln = set["sk" .. i]
+					local pair = bones[i]
+					local shown = false
+					if pair then
+						local a, b = partOf(e, pair[1]), partOf(e, pair[2])
+						if a and b then
+							local pa, oa = cam:WorldToViewportPoint(a.Position)
+							local pb, ob = cam:WorldToViewportPoint(b.Position)
+							if oa and ob and pa.Z > 0 and pb.Z > 0 then
+								ln.From = Vector2.new(pa.X, pa.Y)
+								ln.To = Vector2.new(pb.X, pb.Y)
+								ln.Color = col
+								shown = true
+							end
+						end
+					end
+					ln.Visible = shown
+				end
+			elseif f.sk then
+				for i = 1, MAX_BONES do set["sk" .. i].Visible = false end
+			end
+			f.sk = S.skeleton
+
+			maskSet(set)
 		end
 	end)
 end
 onCleanup(function() ESP.stop() end)
-
