@@ -5,7 +5,15 @@ local motion, sfx = A.motion, A.sfx
 local RunService, UserInputService = A.RunService, A.UserInputService
 local screen, window, shadow, EL = A.screen, A.window, A.shadow, A.EL
 local sidebar, content, accentLinks = A.sidebar, A.content, A.accentLinks
-local maskGuis, uiScales, W, H = A.maskGuis, A.uiScales, A.W, A.H
+local maskGuis, uiScales = A.maskGuis, A.uiScales
+
+-- A config menu is the size of the window it replaces, so it has to read that
+-- size when it is opened, not when it was built. pages/ui.lua rescales the
+-- window (and rewrites A.W / A.H) long after this file has loaded; the old
+-- `W, H` locals were a snapshot of 580x430, so opening any gear menu silently
+-- snapped a resized window back to its default size on the way out.
+local function winW() return (A.W or 580) end
+local function winH() return (A.H or 430) end
 
 local pages, tabs = {}, {}
 A.pages, A.tabs = pages, tabs
@@ -100,6 +108,13 @@ function A.makePage(name, order)
 	function page.section(title, sectionOrder)
 		local sec = new("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = sectionOrder * 2, Parent = scroll })
 		label({ Text = title, Font = FONT.med, TextSize = 11, TextColor3 = T.muted, Position = UDim2.fromOffset(2, 0), Size = UDim2.new(1, -2, 1, 0), Parent = sec })
+		-- a hairline under the heading: on a page of ten rows it is what tells
+		-- "this group is over" from "this group has not started yet"
+		new("Frame", {
+			AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 2, 1, -3),
+			Size = UDim2.new(1, -4, 0, 1), BackgroundColor3 = T.stroke,
+			BackgroundTransparency = 0.45, BorderSizePixel = 0, Parent = sec,
+		})
 		local holder = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = sectionOrder * 2 + 1, Parent = scroll }, {
 			new("UIListLayout", { Padding = UDim.new(0, 5), SortOrder = Enum.SortOrder.LayoutOrder }),
 		})
@@ -155,7 +170,7 @@ onCleanup(function() EL.guard:Disconnect() end)
 function A.makeConfig(title)
 	local frame = new("CanvasGroup", {
 		AnchorPoint = Vector2.new(0.5, 0.5), Position = window.Position,
-		Size = UDim2.fromOffset(W, H), BackgroundColor3 = T.bg,
+		Size = UDim2.fromOffset(winW(), winH()), BackgroundColor3 = T.bg,
 		BackgroundTransparency = 0.03, BorderSizePixel = 0,
 		GroupTransparency = 1, Visible = false, Parent = screen,
 	})
@@ -191,6 +206,11 @@ function A.makeConfig(title)
 	function cfg.section(name, order)
 		local sec = new("Frame", { Size = UDim2.new(1, 0, 0, 26), BackgroundTransparency = 1, LayoutOrder = order * 2, Parent = scroll })
 		label({ Text = name, Font = FONT.med, TextSize = 11, TextColor3 = T.muted, Position = UDim2.fromOffset(2, 0), Size = UDim2.new(1, -2, 1, 0), Parent = sec })
+		new("Frame", {
+			AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 2, 1, -3),
+			Size = UDim2.new(1, -4, 0, 1), BackgroundColor3 = T.stroke,
+			BackgroundTransparency = 0.45, BorderSizePixel = 0, Parent = sec,
+		})
 		return new("Frame", {
 			Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
 			BackgroundTransparency = 1, LayoutOrder = order * 2 + 1, Parent = scroll,
@@ -231,20 +251,20 @@ end
 local function openConfig(cfg)
 	if UI.busy or UI.active then return end
 	UI.busy = true
-	tween(window, 0.2, { GroupTransparency = 1, Size = UDim2.fromOffset(W * 0.94, H * 0.94) })
+	tween(window, 0.2, { GroupTransparency = 1, Size = UDim2.fromOffset(winW() * 0.94, winH() * 0.94) })
 	task.delay(0.2, function()
 		-- screen gone (unload raced the open): release the lock, or every later
 		-- open/close is refused for the rest of the session
 		if not screen.Parent then UI.busy = false; return end
 		window.Visible = false
-		window.Size = UDim2.fromOffset(W, H)
+		window.Size = UDim2.fromOffset(winW(), winH())
 		window.GroupTransparency = 0
 		cfg.frame.Position = window.Position
-		cfg.frame.Size = UDim2.fromOffset(W * 0.7, H * 0.7)
+		cfg.frame.Size = UDim2.fromOffset(winW() * 0.7, winH() * 0.7)
 		cfg.frame.GroupTransparency = 1
 		cfg.frame.Visible = true
 		cfg.scroll.CanvasPosition = Vector2.zero
-		tween(cfg.frame, 0.8, { Size = UDim2.fromOffset(W, H), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
+		tween(cfg.frame, 0.8, { Size = UDim2.fromOffset(winW(), winH()), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
 		UI.active = cfg
 		UI.busy = false
 	end)
@@ -255,7 +275,7 @@ function UI.close()
 	local cfg = UI.active
 	if not cfg or UI.busy then return end
 	UI.busy = true
-	tween(cfg.frame, 0.2, { GroupTransparency = 1, Size = UDim2.fromOffset(W * 0.94, H * 0.94) })
+	tween(cfg.frame, 0.2, { GroupTransparency = 1, Size = UDim2.fromOffset(winW() * 0.94, winH() * 0.94) })
 	task.delay(0.2, function()
 		if not screen.Parent then
 			UI.busy = false -- same lock as openConfig: never leave the panel stranded
@@ -264,11 +284,11 @@ function UI.close()
 		cfg.frame.Visible = false
 		window.Position = cfg.frame.Position
 		shadow.Position = window.Position
-		window.Size = UDim2.fromOffset(W * 0.7, H * 0.7)
+		window.Size = UDim2.fromOffset(winW() * 0.7, winH() * 0.7)
 		window.GroupTransparency = 1
 		window.Visible = true
 		shadow.Visible = true
-		tween(window, 0.8, { Size = UDim2.fromOffset(W, H), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
+		tween(window, 0.8, { Size = UDim2.fromOffset(winW(), winH()), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
 		UI.active = nil
 		UI.busy = false
 	end)
