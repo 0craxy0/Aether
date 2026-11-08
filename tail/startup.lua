@@ -191,6 +191,9 @@ local function show()
 	window.Size = UDim2.fromOffset(A.W * 0.8, A.H * 0.8)
 	window.GroupTransparency = 1
 	tween(window, 0.8, { Size = UDim2.fromOffset(A.W, A.H), GroupTransparency = 0 }, Enum.EasingStyle.Elastic)
+	-- the first page's rows settle in as the panel lands; selectPage deferred this
+	-- because it ran while the loading card was still covering the screen
+	if A.enterActive then pcall(A.enterActive) end
 
 	local key = bindName("Toggle UI")
 	notify("Aether loaded", key and ("press " .. key .. " to hide or show") or "ready", "good")

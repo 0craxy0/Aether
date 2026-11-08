@@ -36,6 +36,15 @@ function A.refreshPages(name)
 	for _, fn in ipairs(A.pageHooks) do pcall(fn, name) end
 end
 
+-- The first page's entrance, played when the panel is actually visible. selectPage
+-- skips the animation while the loading card is still up (see the else-branch
+-- there), so this is what the user's first frame of the hub gets.
+function A.enterActive()
+	local page = pages[A.activeTab]
+	if not (page and A.loadingDone) then return end
+	pcall(motion.reveal, page.scroll)
+end
+
 local function selectPage(name)
 	-- an expanded dropdown belongs to the page it was opened on; leaving it open
 	-- would also leave the page's canvas taller than the rows it now shows
@@ -56,13 +65,23 @@ local function selectPage(name)
 			page.bar.Size = UDim2.fromOffset(2, 0)
 			tween(page.bar, 0.28, { Size = UDim2.fromOffset(2, 14) }, Enum.EasingStyle.Back)
 			if not same then
-				-- the page travels in from the side of the tab you came from,
-				-- then its rows settle in one after another
-				page.scroll.Position = UDim2.fromOffset(dir * 46, 0)
-				page.scale.Scale = 0.97
-				tween(page.scroll, 0.34, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
-				tween(page.scale, 0.34, { Scale = 1 }, Enum.EasingStyle.Quint)
-				pcall(motion.reveal, page.scroll) -- cosmetic: never break a page switch
+				if A.loadingDone then
+					-- the page travels in from the side of the tab you came from,
+					-- then its rows settle in one after another
+					page.scroll.Position = UDim2.fromOffset(dir * 46, 0)
+					page.scale.Scale = 0.97
+					tween(page.scroll, 0.34, { Position = UDim2.fromOffset(0, 0) }, Enum.EasingStyle.Quint)
+					tween(page.scale, 0.34, { Scale = 1 }, Enum.EasingStyle.Quint)
+					pcall(motion.reveal, page.scroll) -- cosmetic: never break a page switch
+				else
+					-- Nothing is on screen yet: the panel's ScreenGui is disabled until
+					-- tail/startup.lua's show() runs. Playing the entrance here spent
+					-- ~50 tweens and one UIScale per row on an animation nobody could
+					-- see, and handed the user a page that had already finished moving.
+					-- Rest now, and play it in A.enterActive once the card is gone.
+					page.scroll.Position = UDim2.fromOffset(0, 0)
+					page.scale.Scale = 1
+				end
 			end
 		end
 		tween(page.btn, 0.25, { TextColor3 = on and T.accent or T.muted })
