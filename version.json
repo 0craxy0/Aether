@@ -1,6 +1,6 @@
 {
-  "rev": 44,
-  "build": "2026-11-08.44",
-  "notes": "Startup is faster: the loader now downloads in a pool of four while still compiling and running the files strictly in order, so the load is no longer the sum of forty round trips; the per-build cache is written off the load thread; and the first page's entrance animation plays when the panel is actually visible instead of behind the loading card. Deadlines use os.clock now, so the stall readout is accurate. getgenv().AetherDebug prints the load time in ms.",
+  "rev": 45,
+  "build": "2026-11-08.45",
+  "notes": "Send a Global Message gets a shelf. Touching a tier's WinPad is what pays, so the new page stands on the pad instead of running the obby: Easy 100, Medium 200, Hard 350, Nightmare 550, Insane 750, read from leaderstats.Cash. Tiers unlock in order and a locked pad bounces you back, so Auto touches each pad once from Easy up, keeps the highest one that paid, and farms that; three quiet attempts stop the loop instead of hammering a pad that moved. Pads are resolved by instance (Map.Obbies.<tier>.WinPad), not by coordinate, and the place is recognised under both 10164995980 and 118282960139128. tools/padlog.lua is the probe that produced those numbers.",
   "loader": "main.lua"
 }

@@ -46,6 +46,7 @@ what changes:
 |---|---|---|
 | `arsenal` | `286090429` | combat (aim, silent aim, kill aura, projectile counter), visuals, movement |
 | `tesla` | `1794074302239` | vehicle tools only - cold gas, auto-pilot |
+| `sendglobal` | `10164995980` | cash farm: stands on a WinPad (see below) |
 | `universal` | anything else | generic tools (character, ESP, movement, actions) + the detected game's own set, if it has one |
 
 A group of game-specific files loads only when that game is **detected** here or
@@ -95,6 +96,47 @@ The Tesla page is two tools and a marker:
 Tuning notes that cannot be settled without the game open: steering sign (see the
 toggle), and the throttle floor at close range (0.45 - raise it if the car stalls
 on a slope). Both live in `modules/tesla.lua`'s drive step.
+
+## send a global message
+
+`shelf: sendglobal` · place `10164995980` (also `118282960139128`, the id the probe
+actually ran under)
+
+The game is a cash sink: finish an obby, get cash, spend it on a server or global
+message. Tiers unlock in order - Easy, Medium, Hard, Nightmare, Insane - and a
+WinPad you have not unlocked bounces you back to the previous tier's start.
+**Touching a WinPad is enough to be paid**, which is what makes the farm possible:
+the module stands on the pad rather than running the obby.
+
+| tier | pays | pad |
+|---|---|---|
+| Easy | 100 | `Map.Obbies.Easy.WinPad` |
+| Medium | 200 | `Map.Obbies.Medium.WinPad` |
+| Hard | 350 | `Map.Obbies.Hard.WinPad` |
+| Nightmare | 550 | `Map.Obbies.Nightmare.WinPad` |
+| Insane | 750 | `Map.Obbies.Insane.WinPad` |
+
+Those six numbers a side (payout and counter) come from `tools/padlog.lua` on a
+live run; the pads themselves are looked up **by instance** on every attempt, not
+by the coordinates in this table. A part found by name cannot drift when the map
+is edited, and a mismatch shows up as `WinPad not found` on the page instead of a
+silent teleport into the floor.
+
+Cash is `leaderstats.Cash`. `SG.cash()` reads any numeric leaderstat or player
+attribute whose name looks like a currency, so a rename does not break the payout
+check - and a payout that does not move the counter is how a locked tier is
+detected, so the two must agree.
+
+- **Auto-farm cash** stands on the selected tier every *Attempt interval*.
+- **Auto** touches each pad once from Easy up, keeps the highest one that paid,
+  and farms that. It is the first thing it does when the switch is turned on and
+  the unlocked tier is still unknown.
+- three attempts in a row with no payout stop the loop and say so, rather than
+  hammering a pad that has moved or a tier that is not unlocked.
+- **Teleport height** is the one knob for a pad that does not register: it is how
+  far above the pad centre the character is placed. The pads sit in the floor, so
+  0-1 studs is usually right and the default is 2.
+- **Rescan pads** re-resolves the five instances, for a map that replicated late.
 
 ## dev tools
 

@@ -24,6 +24,10 @@ local LIST = {
 		blurb = "Open world update: infinite cold gas and auto-pilot with a height-picking camera.",
 	},
 	{
+		key = "sendglobal", name = "Send a Global Message", place = (A.placeIds or {}).sendglobal,
+		blurb = "Cash farm: stands on a tier's WinPad to collect its payout, working up from the highest tier that pays.",
+	},
+	{
 		key = "universal", name = "Universal", place = nil,
 		blurb = "The generic shelf - character, ESP, movement, actions - plus the detected game's own modules, if it has any.",
 	},
