@@ -1,6 +1,6 @@
 {
-  "rev": 70,
-  "build": "2026-11-08.70",
-  "notes": "The accent picker's square was lit from the bottom edge, and only one of its corners was round. The black shade overlay had its transparency the wrong way up, so value ran dark-to-light downward instead of light-to-dark; and the two colour overlays painted straight over the container's rounded corners, because ClipsDescendants clips to the rectangle and not to the UICorner shape - the one round corner you could see was the parent peeking out past a square overlay. Both overlays now carry the same radius, and the gradient runs the right way up. Downgrading from 66 is unchanged and included.",
+  "rev": 71,
+  "build": "2026-11-08.71",
+  "notes": "Rows that are not self-explanatory now end their label with a small '?'. Put the pointer on it and a tooltip the size of its own text appears - wrapped, clamped to the screen, and placed below the mark or above it when there is no room underneath. Twenty-six rows have one, spread across Character, Visuals, World, UI, Settings, Send a Global Message and the owner panel; anything guessable from the name (Noclip, Fullbright, WalkSpeed) is untouched, so a row with an explanation looks like a row that has one. The mark sits where the label ends, measured with TextService, and above the row's own hit area so a toggle's transparent button does not swallow the hover. A.help(\"Row name\", \"text\") is public, and a name that is not on this shelf is a no-op rather than an error.",
   "loader": "main.lua"
 }

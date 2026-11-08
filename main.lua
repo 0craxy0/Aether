@@ -59,13 +59,14 @@ local FILES = {
 	{ "tail/startup.lua" },
 	{ "tail/updater.lua" },
 	{ "tail/admin.lua" }, -- last: it reads A.updater and A.announce
+	{ "tail/help.lua" }, -- after every page: it decorates rows by name
 }
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-08.70"
+local BUILD = "2026-11-08.71"
 -- monotonic: the updater compares rev, never the date string
-local REV = 70
+local REV = 71
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
