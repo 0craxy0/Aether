@@ -67,10 +67,22 @@ end
 local entries = {}   -- { label, kind, get(), path }
 local seen = {}
 
+-- Luau parses `inst:Method` as the start of a call, so a method reference cannot
+-- be tested for truth and then invoked; it has to be called inside a pcall.
+local function debugId(inst)
+	local ok, id = pcall(function() return inst:GetDebugId() end)
+	if ok and type(id) == "string" and id ~= "" then return id end
+	return nil
+end
+
 local function addEntry(inst, kind, attr)
+	local id = debugId(inst)
 	local key
-	if attr then key = inst:GetDebugId and inst:GetDebugId() .. "/" .. attr or path(inst) .. "/" .. attr
-	else key = inst:GetDebugId and inst:GetDebugId() or path(inst) end
+	if attr then
+		key = (id and (id .. "/" .. attr)) or (path(inst) .. "/" .. attr)
+	else
+		key = id or path(inst)
+	end
 	if seen[key] then return end
 	seen[key] = true
 
