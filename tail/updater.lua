@@ -208,6 +208,13 @@ function U.restart()
 		if not okGet or type(src) ~= "string" or #src > (2 * 1024 * 1024) then
 			return warn("[Aether] restart failed: could not download main.lua: " .. tostring(src))
 		end
+		-- The pinned loader is an *older* main.lua, and an old loader takes its
+		-- stage files from the branch - which is how a later build's features
+		-- turned up inside an earlier one. Rewriting the base constant in the
+		-- fetched source pins the whole build, loader and stage files together.
+		if U.pinned() then
+			src = (src:gsub("Aether/main/", "Aether/" .. U.pinned() .. "/", 1))
+		end
 		local fn, err = loadstring(src, "@main.lua")
 		if not fn then return warn("[Aether] restart failed: " .. tostring(err)) end
 		local okRun, runErr = pcall(fn)

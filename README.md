@@ -439,9 +439,18 @@ enough to cover every build this project has shipped.
 
 The pin lives in the config, so it survives a reload, and it is what the teleport
 queue re-runs — a downgrade that silently reverted on the next teleport would not
-be a downgrade. Update prompts go quiet while pinned, **Return to latest** clears
-it and relaunches on the branch, and a pin whose build cannot be downloaded is
-dropped automatically rather than bricking every future launch.
+be a downgrade. Both relaunch paths fetch that commit's own `main.lua` and rewrite
+its stage base before running it, so a rolled-back client runs one whole build:
+its loader, its core, its pages. That matters because an old loader on its own
+would still take stage files from `main`, which is how a later build's features
+once appeared inside an earlier one.
+
+Pasting the latest URL by hand is the one path a pin does not cover: that is a
+deliberate request for the current build, and it wins.
+
+Update prompts go quiet while pinned, **Return to latest** clears it and relaunches
+on the branch, and a pin whose build cannot be downloaded is dropped automatically
+rather than bricking every future launch.
 
 `tail/updater.lua` reads `version.json` every 15s (Settings > Updates) and compares
 its `rev` with the `rev` compiled into the running loader. A POST endpoint on

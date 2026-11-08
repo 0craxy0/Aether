@@ -63,9 +63,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-08.68"
+local BUILD = "2026-11-08.69"
 -- monotonic: the updater compares rev, never the date string
-local REV = 68
+local REV = 69
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -516,6 +516,13 @@ end
 -- be stale, so ask the API (a different host, no such cache) which commit main is
 -- on and fetch every stage file from <repo>/<sha>/. One small request at startup;
 -- if it fails, the plain base is used and the rev query is still there.
+-- A rollback is handled where the rollback happens --------------------------------
+-- This loader always loads its own build: the stage base is either the commit the
+-- API says main is on, or the branch itself. A downgrade is a *different loader*
+-- being run on purpose - tail/updater.lua fetches the pinned main.lua and rewrites
+-- its base before executing it - so this file does not know about pins, and should
+-- not: a newer loader honouring an older pin would ask for pages that do not exist
+-- in that older tree and fail outright.
 local PINNED = false
 if A.cmdRef then
 	local ok, body = pcall(game.HttpGet, game, A.cmdRef .. "?t=" .. tostring(os.time()))

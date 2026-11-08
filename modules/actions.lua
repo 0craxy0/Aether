@@ -91,7 +91,12 @@ local function buildQueue()
 	-- build the user chose, not on whatever the branch has become
 	local pin = A.extra and A.extra.pinCommit
 	if type(pin) == "string" and pin ~= "" and A.rawBase then
-		return string.format("loadstring(game:HttpGet(%q))()", A.rawBase .. pin .. "/main.lua")
+		-- fetch the pinned loader and rewrite its base before running it: a build
+		-- from before the pin file existed would otherwise load the branch's stage
+		-- files underneath its own old file list
+		return string.format(
+			"do local s = game:HttpGet(%q) if type(s) == 'string' then s = s:gsub('Aether/main/', 'Aether/%s/') end loadstring(s)() end",
+			A.rawBase .. pin .. "/main.lua", pin)
 	end
 	if src and A.cmdRef and A.rawBase then
 		return pinnedRunner(A.cmdRef, A.rawBase, src)
