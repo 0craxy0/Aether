@@ -1,5 +1,5 @@
 local A = ...
-local makePage, slider, toggle = A.makePage, A.slider, A.toggle
+local makePage, slider, toggle, button = A.makePage, A.slider, A.toggle, A.button
 local state, charParts = A.state, A.charParts
 
 local pChar = makePage("Character", 1)
@@ -23,4 +23,12 @@ toggle(sChar2, "Infinite jump", false, A.setInfJump)
 toggle(sChar2, "Noclip", false, A.setNoclip)
 toggle(sChar2, "Anti-AFK", true, A.setAntiAfk)
 toggle(sChar2, "Anti-void", false, A.setAntiVoid)
+
+-- protection: about other people's scripts, not yours --------------------------
+local sChar3 = pChar.section("Protection", 3)
+toggle(sChar3, "Anti-fling", false, function(v) A.guard.setFling(v) end)
+-- Off by default: it cannot tell an attacker from the game teleporting you after
+-- a win, and it will fight the second one.
+toggle(sChar3, "Anti-teleport", false, function(v) A.guard.setTeleport(v) end)
+button(sChar3, "Panic: reset and unload", "PANIC", A.guard.panic)
 

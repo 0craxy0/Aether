@@ -26,6 +26,9 @@ local FILES = {
 	{ "modules/character.lua" }, -- walk speed, noclip, anti-afk: every shelf
 	{ "modules/esp.lua" },
 	{ "modules/actions.lua" },
+	{ "modules/waypoints.lua" }, -- saved positions, persisted in A.extra
+	{ "modules/world.lua" }, -- find/highlight/low graphics/server info
+	{ "modules/guard.lua" }, -- anti-fling, anti-teleport, panic
 	{ "modules/aim.lua", "arsenal" },
 	{ "modules/silentaim.lua", "arsenal" },
 	{ "modules/killaura.lua", "arsenal" },
@@ -39,6 +42,7 @@ local FILES = {
 	{ "pages/combat.lua", "arsenal" },
 	{ "pages/tesla.lua", "tesla" },
 	{ "pages/players.lua" },
+	{ "pages/world.lua" }, -- find, highlight, server info
 	{ "pages/sendglobal.lua", "sendglobal" }, -- after Players: equal LayoutOrder, insertion order wins
 	{ "tail/keylist.lua" }, -- before pages/ui (it creates A.kbList)
 	{ "pages/ui.lua" }, -- creates A.sUI4 for the files below
@@ -57,9 +61,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-08.47"
+local BUILD = "2026-11-08.48"
 -- monotonic: the updater compares rev, never the date string
-local REV = 47
+local REV = 48
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache

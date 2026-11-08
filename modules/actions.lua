@@ -6,7 +6,10 @@ local charParts = A.charParts
 function A.tpTo(plr)
 	local _, _, mine = charParts()
 	local theirs = plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-	if mine and theirs then mine.CFrame = theirs.CFrame * CFrame.new(0, 0, 3) end
+	if mine and theirs then
+		if A.guard and A.guard.expect then A.guard.expect(2) end
+		mine.CFrame = theirs.CFrame * CFrame.new(0, 0, 3)
+	end
 end
 
 function A.tpToCursor()
@@ -15,7 +18,10 @@ function A.tpToCursor()
 	local loc = UserInputService:GetMouseLocation()
 	local ray = cam:ScreenPointToRay(loc.X, loc.Y)
 	local hit = workspace:Raycast(ray.Origin, ray.Direction * 2000)
-	if root then root.CFrame = CFrame.new((hit and hit.Position or (ray.Origin + ray.Direction * 40)) + Vector3.new(0, 4, 0)) end
+	if root then
+		if A.guard and A.guard.expect then A.guard.expect(2) end
+		root.CFrame = CFrame.new((hit and hit.Position or (ray.Origin + ray.Direction * 40)) + Vector3.new(0, 4, 0))
+	end
 end
 
 function A.rejoin()

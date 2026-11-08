@@ -12,17 +12,53 @@ function A.charParts()
 end
 local charParts = A.charParts
 
-local state = { speed = 16, jump = 50, fov = 70, speedActive = false, jumpActive = false }
+local state = { speed = 16, jump = 50, fov = 70, speedActive = false, jumpActive = false, anchored = false }
 A.state = state
 
+-- Anchor that survives a respawn ------------------------------------------------
+-- The old control was a button that flipped HumanoidRootPart.Anchored and forgot
+-- about it, so a reset left you falling and the button claiming to be on. Storing
+-- the intent in state and replaying it from reapply() means the anchor comes back
+-- with the character, which is the only version of it that is useful.
+local anchorConn
+
+local function applyAnchor()
+	local _, _, root = charParts()
+	if root then root.Anchored = state.anchored end
+end
+
+function A.setAnchor(on)
+	state.anchored = on and true or false
+	applyAnchor()
+	if anchorConn then anchorConn:Disconnect(); anchorConn = nil end
+	if not state.anchored then return end
+	-- A respawn builds a new root on its own schedule; sit on it until it exists
+	-- rather than racing CharacterAdded by a fixed delay.
+	local tries = 0
+	anchorConn = LP.CharacterAdded:Connect(function()
+		task.spawn(function()
+			while state.anchored and tries < 60 do
+				tries += 1
+				task.wait(0.1)
+				local _, _, root = charParts()
+				if root then
+					root.Anchored = true
+					return
+				end
+			end
+		end)
+	end)
+end
+
 local function reapply()
-	local _, hum = charParts()
+	local _, hum, root = charParts()
 	if not hum then return end
 	if state.speedActive then hum.WalkSpeed = state.speed end
 	if state.jumpActive then
 		hum.UseJumpPower = true
 		hum.JumpPower = state.jump
 	end
+	if state.anchored and root then root.Anchored = true end
 end
 local charConn = LP.CharacterAdded:Connect(function()
 	task.wait(0.6)

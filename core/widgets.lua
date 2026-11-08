@@ -291,6 +291,44 @@ function A.slider(parent, name, min, max, default, onChanged)
 	return { set = set, get = function() return value end, row = r }
 end
 
+-- input -------------------------------------------------------
+-- A row with one text field. Commit on Enter or on losing focus, never per
+-- keystroke: every caller here does something with the string (a search over
+-- Workspace, a file on disk) and a per-key callback would run both sixty times.
+function A.input(parent, name, placeholder, onCommit, defaultText)
+	local r = rowBase(parent, 40)
+	rowLabel(r, name, name)
+	local box = new("TextBox", {
+		Text = tostring(defaultText or ""), PlaceholderText = placeholder or "",
+		PlaceholderColor3 = T.muted, Font = FONT.reg, TextSize = 11, TextColor3 = T.text,
+		BackgroundColor3 = T.panel, BackgroundTransparency = 0.25, BorderSizePixel = 0,
+		TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false,
+		Position = UDim2.fromOffset(11, 18), Size = UDim2.new(1, -22, 0, 18), Parent = r,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0, 5) }),
+		new("UIPadding", { PaddingLeft = UDim.new(0, 7), PaddingRight = UDim.new(0, 7) }),
+	})
+
+	local function commit()
+		if onCommit then
+			local ok, err = pcall(onCommit, box.Text)
+			if not ok then notify(name, tostring(err), "bad") end
+		end
+	end
+	box.FocusLost:Connect(commit)
+	box.MouseEnter:Connect(function() tween(box, 0.12, { BackgroundTransparency = 0 }) end)
+	box.MouseLeave:Connect(function()
+		if not box:IsFocused() then tween(box, 0.12, { BackgroundTransparency = 0.25 }) end
+	end)
+
+	register(r, name)
+	return {
+		row = r,
+		get = function() return box.Text end,
+		set = function(v) box.Text = tostring(v or "") end,
+	}
+end
+
 -- button ------------------------------------------------------
 function A.button(parent, name, text, callback)
 	text = text:sub(1, 1) .. text:sub(2):lower()

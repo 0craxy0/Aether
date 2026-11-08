@@ -4,6 +4,7 @@ local sfx = A.sfx
 local HttpService, has = A.HttpService, A.has
 local accentLinks = A.accentLinks
 local toggle, button, dropdown = A.toggle, A.button, A.dropdown
+local input, label = A.input, A.label
 
 -- accent colour ---------------------------------------------------
 -- The picker stores a hex string. These names are kept only so a config written
@@ -70,9 +71,16 @@ end
 function A.loadConfig()
 	if not (has.readfile and has.isfile and isfile(FILE)) then return false, "no saved config" end
 	local ok, data = pcall(function() return HttpService:JSONDecode(readfile(FILE)) end)
-	if not ok or type(data) ~= "table" then return false, "config unreadable" end
-	-- replaying a config fires every widget at once: do it silently, and keep
-	-- auto-save out of it so the file is not rewritten while it is being read
+	if not ok then return false, "config unreadable" end
+	return A.applyConfig(data)
+end
+
+-- Replaying a config is the same job whether it came from the live file or from
+-- a named profile, so it lives in one place. sfx is muted and auto-save is held
+-- off for the duration: a replay fires every widget at once and must not write
+-- the file it is reading.
+function A.applyConfig(data)
+	if type(data) ~= "table" then return false, "config unreadable" end
 	sfx.mute = sfx.mute + 1
 	A.configLoading = true
 	pcall(function()
@@ -86,8 +94,8 @@ function A.loadConfig()
 	if type(data.__extra) == "table" then
 		for k, v in pairs(data.__extra) do A.extra[k] = v end
 	end
-	-- Pages whose rows are built from the config (saved Tesla spots, the profile
-	-- list) were drawn before this file was read, so they still show the previous
+	-- Pages whose rows are built from the config (saved Tesla spots, waypoints)
+	-- were drawn before this file was read, so they still show the previous
 	-- session's rows. Replaying a config without telling them is why "Load config"
 	-- looked like it half-worked.
 	if A.refreshPages then pcall(A.refreshPages) end
@@ -180,5 +188,111 @@ button(sSess, "Unload Aether", "UNLOAD", function()
 	-- function and have it called here instead.
 	if type(A.unload) == "function" then A.unload() end
 end)
+
+-- profiles --------------------------------------------------------------------
+-- A named profile is this same config file under a different name. One file is
+-- fine until you use the hub for two things - a combat shelf and a farm have
+-- almost nothing in common - and then every switch costs a round of re-dialling.
+-- Deliberately a text field rather than a dropdown: the list changes as you
+-- create and delete, and rebuilding a dropdown row in place is not worth the
+-- plumbing for what is four rows and a label.
+local PROFILE_DIR = "Aether/profiles"
+
+local function cleanName(name)
+	return tostring(name or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function profilePath(name)
+	return PROFILE_DIR .. "/" .. name .. ".json"
+end
+
+function A.profileNames()
+	local out = {}
+	if type(listfiles) ~= "function" then return out end
+	local ok, files = pcall(listfiles, PROFILE_DIR)
+	if not ok or type(files) ~= "table" then return out end
+	for _, f in ipairs(files) do
+		local name = tostring(f):match("([^/\\]+)%.json$")
+		if name then out[#out + 1] = name end
+	end
+	table.sort(out)
+	return out
+end
+
+function A.saveProfile(name)
+	name = cleanName(name)
+	if name == "" then return false, "name is empty" end
+	if not has.writefile then return false, "writefile unsupported" end
+	if type(makefolder) == "function" then
+		pcall(makefolder, "Aether")
+		pcall(makefolder, PROFILE_DIR)
+	end
+	local ok, encoded = pcall(function() return HttpService:JSONEncode(A.buildConfig()) end)
+	if not ok or type(encoded) ~= "string" then return false, tostring(encoded) end
+	local okWrite, err = pcall(writefile, profilePath(name), encoded)
+	return okWrite, okWrite and ("saved " .. name) or tostring(err)
+end
+
+function A.loadProfile(name)
+	name = cleanName(name)
+	if not (has.readfile and has.isfile and isfile(profilePath(name))) then
+		return false, "no profile named " .. name
+	end
+	local ok, data = pcall(function() return HttpService:JSONDecode(readfile(profilePath(name))) end)
+	if not ok then return false, "profile unreadable" end
+	local applied, why = A.applyConfig(data)
+	if applied then return true, "loaded " .. name end
+	return false, tostring(why)
+end
+
+function A.deleteProfile(name)
+	name = cleanName(name)
+	if type(delfile) ~= "function" then return false, "delfile unsupported" end
+	local ok, err = pcall(delfile, profilePath(name))
+	return ok, ok and ("deleted " .. name) or tostring(err)
+end
+
+local sProf = pSet.section("Profiles", 5)
+local refreshProfiles -- declared first: the input below calls it
+
+local profInput = input(sProf, "Profile name", "arsenal, chill, farm", function(v)
+	local ok, msg = A.saveProfile(v)
+	notify("Profiles", tostring(msg), ok and "good" or "bad")
+	refreshProfiles()
+end)
+
+button(sProf, "Save as profile", "SAVE", function()
+	local ok, msg = A.saveProfile(profInput.get())
+	notify("Profiles", tostring(msg), ok and "good" or "bad")
+	refreshProfiles()
+end)
+button(sProf, "Load profile", "LOAD", function()
+	local ok, msg = A.loadProfile(profInput.get())
+	notify("Profiles", tostring(msg), ok and "good" or "bad")
+end)
+button(sProf, "Delete profile", "DELETE", function()
+	local ok, msg = A.deleteProfile(profInput.get())
+	notify("Profiles", tostring(msg), ok and "good" or "bad")
+	refreshProfiles()
+end)
+
+local profListLbl = label({
+	Text = "", TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+	Size = UDim2.new(1, 0, 0, 32), Parent = sProf,
+})
+
+refreshProfiles = function()
+	if not profListLbl.Parent then return end
+	local names = A.profileNames()
+	if #names == 0 then
+		profListLbl.Text = has.writefile and "no saved profiles yet" or "writefile unsupported - profiles unavailable"
+	else
+		profListLbl.Text = "saved: " .. table.concat(names, ", ")
+	end
+end
+A.onPage(function(name)
+	if name == "Settings" then refreshProfiles() end
+end)
+refreshProfiles()
 
 A.stage("7 settings page done")

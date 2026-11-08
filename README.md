@@ -245,6 +245,61 @@ and the size is remembered, so a restart comes back to the panel you left rather
 than to 580x430. It is registered without a row, so it never appears in search,
 and `Reset UI size` writes the default back.
 
+### profiles
+
+A named profile is the same config file under a different name, in
+`Aether/profiles/<name>.json`. **Settings > Profiles** takes a name and offers
+Save as profile / Load profile / Delete profile; the name is lowercased and
+stripped to letters, digits, `-` and `_` first, so `Arsenal pvp` becomes
+`arsenal-pvp`. Loading goes through the same replay as **Load config**, so a
+profile is a whole panel state - every shelf, every slider, the window size -
+not just a preset for one page. Nothing is written to a profile until you say
+save, and the live config is never overwritten by a load until auto-save fires.
+
+## world and safety
+
+Two pages that are about the place rather than about your character.
+
+**Movement** keeps waypoints: type a name, **SAVE** stores your position in the
+config under `waypoints` (flat x/y/z numbers, not a `Vector3`, because
+`JSONEncode` cannot write one). Each saved row shows its coordinates and how far
+away it is, with **GO** to jump there and an x to delete it. 24 of them, names up
+to 24 characters, re-saving the same name updates it in place.
+
+**World** is the finder:
+
+- **Find & teleport** searches every `BasePart` and `Model` in `Workspace` by name
+  substring, capped at 40 hits. Each result shows the instance's path and your
+  distance to it; **GO** puts you three studs above it.
+- **Highlight objects** draws a box and a distance label on matching parts through
+  the `Drawing` API, rescanned every 1.5s inside a range you set (default 300
+  studs, 24 objects). Nothing is drawn on top of the panel itself.
+- **This server** prints place id, job id, player count, server uptime, and ping
+  (`Stats.Network.ServerStatsItem["Data Ping"]`), plus your name/id, executor and
+  build, refreshed every two seconds while the page is open.
+- **Low graphics** is on the Visuals page: it stops every particle/trail/beam/
+  smoke/fire/sparkle and hides decals and textures, and zeroes the two lighting
+  environment scales. It does not touch `FogEnd` or `GlobalShadows` - those belong
+  to Remove fog and Fullbright, and one property with two owners means whichever
+  switch you turn off last wins. Turning it off restores what it changed.
+
+### guard
+
+Three switches on the Character page, all about other people's scripts:
+
+- **Anti-fling** cancels an `AssemblyAngularVelocity` above 2500 rad/s and caps
+  linear velocity at 400 studs/s. Nothing legitimate spins you that fast.
+- **Anti-teleport** is off by default and honest about why: it cannot tell an
+  attacker from the game itself, so it fights any scripted move including a game
+  that teleports you after a win. Anything in the hub that moves you - waypoints,
+  the finder, player teleport - calls `A.guard.expect(2)` first so it is left
+  alone.
+- **Panic** resets the character and unloads the hub in one press. Bound to `End`
+  on the Keybinds page.
+
+Both guard switches share one `Heartbeat` and one idea of "the current root";
+last position is cleared on `CharacterAdded`, because a respawn legitimately
+starts somewhere else.
 
 ## read aloud
 

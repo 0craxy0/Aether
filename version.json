@@ -1,6 +1,6 @@
 {
-  "rev": 47,
-  "build": "2026-11-08.47",
-  "notes": "Send a Global Message: the payout is confirmed from the server's own signal now. On completion the server fires ObbyUnlocked(tier, next), CashBurst(amount, tier) and TutorialObbyCompleted(tier) at the client - three notifications, one of which carries the amount the server already granted. The farm listens to CashBurst and takes that amount as the result, so an attempt no longer has to diff leaderstats and hope nothing else moved the counter; the counter read stays as the fallback for a client where the hook does not install, and the status block says which one is in use. Nothing here sends anything to the server.",
+  "rev": 48,
+  "build": "2026-11-08.48",
+  "notes": "Universal tools. Waypoints save a named position into the config and put you back on it, with the distance shown before you jump. World finds any part or model in Workspace by name and teleports to it, highlights the ones you care about through the Drawing API, and prints this server's id, age, ping and player count. Low graphics stops the effects and the environment lighting when the device is struggling. Character gains anti-fling and anti-teleport, and End resets you and unloads the hub in one press. Settings gains named profiles: the same config file, saved under a name, so a whole panel state comes back in one click. Anchor, speed and jump now survive a respawn instead of being lost to the reset.",
   "loader": "main.lua"
 }

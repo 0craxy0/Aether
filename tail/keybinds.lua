@@ -28,6 +28,7 @@ end
 local sKeys2 = pKeys.section("Interface", 2)
 A.keybind(sKeys2, "Toggle UI", "RightShift")
 A.keybind(sKeys2, "Teleport to cursor")
+A.keybind(sKeys2, "Panic (reset + unload)", "End")
 
 -- flips a toggle through the registry (fires its callback like a click) --
 local function flip(widgetName)
@@ -51,6 +52,7 @@ local actions = {
 	["Toggle fullbright"] = flip("Fullbright"),
 	["Toggle UI"] = function() if A.toggleUI then A.toggleUI() end end,
 	["Teleport to cursor"] = function() A.tpToCursor() end,
+	["Panic (reset + unload)"] = function() if A.guard then A.guard.panic() end end,
 	["Toggle cold gas"] = function()
 		for _, e in ipairs(A.registry) do
 			if e.name == "Infinite cold gas" and e.load and e.save then
