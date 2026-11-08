@@ -237,7 +237,7 @@ def("cmds", ";cmds", "this list", function()
 	local lines = { "[Aether] commands (prefix " .. CM.prefix .. ")" }
 	for _, d in ipairs(order) do lines[#lines + 1] = d.usage end
 	print(table.concat(lines, "\n"))
-	return true, #order .. " commands - the full list is in the console"
+	return true, #order .. " commands. that is all of them, probably."
 end)
 
 -- an alias so ";help" does not come back as an unknown command
@@ -258,6 +258,26 @@ end }
 
 defs["42"] = { name = "42", usage = ";42", run = function()
 	return true, "the answer, and roughly the odds of finding this."
+end }
+
+defs.sudo = { name = "sudo", usage = ";sudo <anything>", run = function()
+	return false, "user is not in the sudoers file. this incident will be reported."
+end }
+
+defs.rm = { name = "rm", usage = ";rm -rf /", run = function(arg)
+	return false, string.format("denied - %s is in your executor's memory, not on a disk. ask again after the heat death of the universe.", tostring(arg or "that"))
+end }
+
+defs.whoami = { name = "whoami", usage = ";whoami", run = function()
+	return true, "the only account that can see this page. do not let it go to your head."
+end }
+
+defs.exit = { name = "exit", usage = ";exit", run = function()
+	return false, "there is no exit. there is End."
+end }
+
+defs.hello = { name = "hello", usage = ";hello", run = function()
+	return true, "hello, world."
 end }
 
 ------------------------------------ dispatch ---------------------------------

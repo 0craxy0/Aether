@@ -15,6 +15,7 @@ end
 local registry = {}      -- search + config index
 local accentLinks = {}   -- objects that repaint on accent change
 local setters = {}       -- toggle name -> its set(), for A.setToggle
+local flips, flipAt = {}, {} -- rapid-flip counter, see set() below
 local KB = {
 	active = {}, index = {}, onToggle = function(_name, _v) end,
 	listening = false, -- true while a keybind row is waiting for a key
@@ -106,6 +107,21 @@ function A.toggle(parent, name, default, onChanged)
 					tween(switch, 0.5, { Size = UDim2.fromOffset(40, 24) }, Enum.EasingStyle.Elastic)
 				end
 			end)
+		end
+		if not silent then
+			-- nine rapid flips of the same switch is not indecision, it is someone
+			-- trying to break it; the panel is allowed to have an opinion
+			local now = os.clock()
+			if now - (flipAt[name] or 0) < 0.4 then
+				flips[name] = (flips[name] or 0) + 1
+			else
+				flips[name] = 1
+			end
+			flipAt[name] = now
+			if flips[name] == 9 and A.onFlipAbuse then
+				local ok, err = pcall(A.onFlipAbuse, name, v)
+				if not ok then warn("[Aether] flip hook: " .. tostring(err)) end
+			end
 		end
 		if not silent and onChanged then
 			local ok, err = pcall(onChanged, v)

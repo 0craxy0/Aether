@@ -1,6 +1,6 @@
 {
-  "rev": 58,
-  "build": "2026-11-08.58",
-  "notes": "A few things in this build are not described here, and that is deliberate - a build that lists its own secrets does not have any. They are small, they change no setting, they touch no module, and none of them talks to a network. The rest of the note is the honest part: the owner panel's rebuild from 55 and the loader's commit pinning from 56 are both in this one, so this is the first build where the Admin tab actually opens.",
+  "rev": 59,
+  "build": "2026-11-08.59",
+  "notes": "Still not listing them. Two more words answer if you type them with no text box focused, one of them rudely; a toggle that gets flipped nine times in a row now comments on it; leaving the panel untouched for ten and then twenty minutes earns two remarks; the search box answers 'no' literally; and there are five more commands that are not in the output of ;cmds, which itself now ends on a hedge. Every one is a notification or a colour - no setting changes, no module is touched, nothing leaves the client.",
   "loader": "main.lua"
 }
