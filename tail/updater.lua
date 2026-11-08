@@ -54,6 +54,8 @@ end
 local warnedStale = false
 
 local function check()
+	-- a pinned client is not looking for new builds; that is the whole point
+	if U.pinned and U.pinned() then return nil end
 	local body = fetch()
 	if not body then return nil end
 	local ok, data = pcall(function() return HttpService:JSONDecode(body) end)
@@ -181,8 +183,9 @@ function U.restart()
 		-- Resolve the commit first, then load <commit>/main.lua. A query string is
 		-- not enough: the CDN in front of raw.githubusercontent caches by path and
 		-- was still serving the previous build to a client that changed its query.
-		local sha
-		if A.cmdRef then
+		-- A pin wins over both: a rollback has to relaunch the build it pinned to.
+		local sha = U.pinned()
+		if not sha and A.cmdRef then
 			local okRef, ref = pcall(function()
 				return HttpService:JSONDecode(game:HttpGet(A.cmdRef .. "?t=" .. tostring(os.time())))
 			end)
@@ -193,6 +196,15 @@ function U.restart()
 		local url = (A.rawBase and type(sha) == "string" and (A.rawBase .. sha .. "/main.lua"))
 			or (A.base .. "main.lua?t=" .. tostring(os.time()))
 		local okGet, src = pcall(game.HttpGet, game, url)
+		if (not okGet or type(src) ~= "string" or src == "") and U.pinned() then
+			-- a pin that cannot be fetched would brick every launch from the
+			-- teleport queue, so drop it and come back up on the branch
+			A.extra.pinCommit, A.extra.pinRev = nil, nil
+			pcall(A.flushConfig)
+			warn("[Aether] pinned build could not be downloaded - pin cleared")
+			url = A.base .. "main.lua?t=" .. tostring(os.time())
+			okGet, src = pcall(game.HttpGet, game, url)
+		end
 		if not okGet or type(src) ~= "string" or #src > (2 * 1024 * 1024) then
 			return warn("[Aether] restart failed: could not download main.lua: " .. tostring(src))
 		end
@@ -205,6 +217,12 @@ end
 
 -- a check the user or the owner panel asked for, bypassing the cooldown
 function U.checkNow()
+	if U.pinned and U.pinned() then
+		local rev = A.extra and A.extra.pinRev
+		notify("Updates", "pinned to " .. (rev and ("rev " .. rev) or "an older commit") ..
+			" - press Return to latest to resume updates", "info")
+		return false
+	end
 	U.dismissed = {}
 	U.quietUntil = 0
 	U.nextCheck = 0
@@ -266,6 +284,85 @@ function U.apply(info)
 	U.restart()
 end
 
+-- rollback ---------------------------------------------------------
+-- Pin this client to an older build, by rev or by commit. The pin lives in the
+-- config, so it survives a reload and is honoured by the auto-execute queue as
+-- well: a downgrade that quietly reverted on the next teleport would not be a
+-- downgrade. Update prompts are suppressed while pinned - offering "restart into
+-- the latest" to someone who just rolled back is the opposite of helpful.
+--
+-- Rev numbers are not in the repo anywhere; they are in the commit messages
+-- ("... (rev 64)"), because that is the only place a build can prove which rev
+-- it is. One request for the last hundred commits is enough to map every rev
+-- this project has ever shipped to the commit that carries it.
+local U.indexCache, U.indexAt = nil, 0
+
+local function commitsUrl()
+	local base = A.rawBase
+	local slug = base and base:match("raw%.githubusercontent%.com/([^/]+/[^/]+)/")
+	if not slug then return nil end
+	return "https://api.github.com/repos/" .. slug .. "/commits?per_page=100"
+end
+
+local function revIndex()
+	if U.indexCache and os.clock() - U.indexAt < 120 then return U.indexCache end
+	local url = commitsUrl()
+	if not url then return nil, "this build does not know its repo" end
+	local ok, body = pcall(game.HttpGet, game, url .. "&t=" .. tostring(os.time()))
+	if not ok or type(body) ~= "string" or body == "" then return nil, "could not read the commit list" end
+	local okDecode, list = pcall(function() return HttpService:JSONDecode(body) end)
+	if not okDecode or type(list) ~= "table" then return nil, "the commit list was not readable" end
+	local map = {}
+	for _, c in ipairs(list) do
+		if type(c) == "table" and type(c.sha) == "string" then
+			local msg = type(c.commit) == "table" and c.commit.message or ""
+			local rev = tostring(msg):match("%(rev (%d+)%)")
+			if rev then map[tonumber(rev)] = c.sha end
+		end
+	end
+	U.indexCache, U.indexAt = map, os.clock()
+	return map
+end
+
+function U.pinned()
+	local sha = A.extra and A.extra.pinCommit
+	return type(sha) == "string" and sha ~= "" and sha or nil
+end
+
+local function resolveTarget(text)
+	text = tostring(text or ""):gsub("%s+", "")
+	if text == "" then return nil, "type a rev or a commit" end
+	if #text >= 7 and text:match("^%x+$") then return text end
+	local rev = tonumber(text)
+	if not rev then return nil, "that is neither a rev nor a commit" end
+	if rev == (A.rev or 0) then return nil, "that is the build you are on" end
+	local map, why = revIndex()
+	if not map then return nil, why end
+	local sha = map[rev]
+	if not sha then return nil, "rev " .. rev .. " is not among the last 100 commits" end
+	return sha
+end
+
+function U.rollback(text)
+	local sha, why = resolveTarget(text)
+	if not sha then return false, why end
+	A.extra.pinCommit = sha
+	A.extra.pinRev = tonumber(tostring(text):gsub("%s+", "")) or nil
+	local okSave, saved, msg = pcall(A.flushConfig)
+	if not (okSave and saved == true) then
+		A.extra.pinCommit, A.extra.pinRev = nil, nil
+		return false, "config could not be saved: " .. tostring(msg or saved)
+	end
+	U.restart()
+	return true
+end
+
+function U.unpin()
+	A.extra.pinCommit, A.extra.pinRev = nil, nil
+	pcall(A.flushConfig)
+	U.restart()
+end
+
 -- settings rows --------------------------------------------------
 local pSet = A.pageSettings
 if pSet then
@@ -276,6 +373,39 @@ if pSet then
 		U.nextCheck = 0
 	end)
 	button(sUpd, "Check now", "CHECK", function() U.checkNow() end)
+
+	local rollBox = A.input(sUpd, "Roll back to rev", "64, or a commit sha", function(v)
+		local ok, why = U.rollback(v)
+		if not ok then notify("Rollback", tostring(why), "bad") end
+	end)
+	button(sUpd, "Roll back", "GO", function()
+		local ok, why = U.rollback(rollBox.get())
+		if not ok then notify("Rollback", tostring(why), "bad") end
+	end)
+	button(sUpd, "Return to latest", "LATEST", function()
+		if not U.pinned() then return notify("Rollback", "not pinned - already on the latest build", "info") end
+		U.unpin()
+	end)
+	local pinLbl = label({
+		Text = "", TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+		Size = UDim2.new(1, 0, 0, 32), Parent = sUpd,
+	})
+	local function paintPin()
+		if not pinLbl.Parent then return end
+		local sha = U.pinned()
+		if sha then
+			local rev = A.extra and A.extra.pinRev
+			pinLbl.Text = "pinned to " .. (rev and ("rev " .. rev) or ("commit " .. sha:sub(1, 7))) ..
+				" · this build, and every relaunch from the teleport queue, stays on it. "
+				.. "Update prompts are quiet until Return to latest."
+			pinLbl.TextColor3 = T.warn
+		else
+			pinLbl.Text = "not pinned · a rollback survives a reload and is what the teleport queue runs."
+			pinLbl.TextColor3 = T.muted
+		end
+	end
+	paintPin()
+	A.onPage(function(name) if name == "Settings" then paintPin() end end)
 end
 
 -- loop -----------------------------------------------------------

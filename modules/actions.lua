@@ -87,6 +87,12 @@ end
 
 local function buildQueue()
 	local src = ownSource(A.source) or ownSource(getgenv and getgenv().AetherSource)
+	-- a rollback pin outranks everything: the next server must come up on the
+	-- build the user chose, not on whatever the branch has become
+	local pin = A.extra and A.extra.pinCommit
+	if type(pin) == "string" and pin ~= "" and A.rawBase then
+		return string.format("loadstring(game:HttpGet(%q))()", A.rawBase .. pin .. "/main.lua")
+	end
 	if src and A.cmdRef and A.rawBase then
 		return pinnedRunner(A.cmdRef, A.rawBase, src)
 	end

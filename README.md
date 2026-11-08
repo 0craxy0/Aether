@@ -432,6 +432,17 @@ cannot be forged or shared has to be issued and verified by the Worker.
 
 ## updating
 
+**Roll back to rev** (Settings > Updates) pins this client to an older build. Type
+a rev (`64`) or a commit sha; revs are resolved from the commit messages, which is
+the only place a build proves what rev it is, and the last hundred commits are
+enough to cover every build this project has shipped.
+
+The pin lives in the config, so it survives a reload, and it is what the teleport
+queue re-runs — a downgrade that silently reverted on the next teleport would not
+be a downgrade. Update prompts go quiet while pinned, **Return to latest** clears
+it and relaunches on the branch, and a pin whose build cannot be downloaded is
+dropped automatically rather than bricking every future launch.
+
 `tail/updater.lua` reads `version.json` every 15s (Settings > Updates) and compares
 its `rev` with the `rev` compiled into the running loader. A POST endpoint on
 `A.updater.api` is used when the executor has a `request` function, and the static
