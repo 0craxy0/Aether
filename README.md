@@ -408,11 +408,27 @@ just collected in one place.
 
 It is laid out as an instrument panel rather than a settings list: a **status
 strip** with a live dot, the running build in large type and the rev beside it,
-then **Composer**, **Release** and **Session** below. The composer's note kind is a
-segmented control, its character budget is a bar that turns red when you pass it,
-and the field styling (focus ring, padding, stroke) is the same code path the
-shared widgets use, so the page reads as part of the program. Session is a
-right-aligned key/value column with a **Copy diagnostics** button for bug reports.
+then **Composer**, **Release**, **Device** and **Session** below. The composer's
+note kind is a segmented control, its character budget is a bar that turns red
+when you pass it, and the field styling (focus ring, padding, stroke) is the same
+code path the shared widgets use, so the page reads as part of the program.
+Session is a right-aligned key/value column with a **Copy diagnostics** button for
+bug reports.
+
+**Remember this device** is the only thing in the hub that writes a credential to
+disk, and it is off until you turn it on. With it on, the first publish that the
+endpoint *accepts* writes `Aether/publish.dkey`: the token, the account, the
+executor, and a hardware id where the executor exposes one. A later load reads it,
+checks the account and device, and unlocks publishing with the box already filled.
+If the endpoint ever answers 401 to that stored token, the file is deleted and the
+box cleared, so a rotated token cannot fail silently forever. Off, the token lives
+in memory only, as before.
+
+What it is worth being clear about: that file is plaintext. It stops the token
+being lifted to another account or machine and used there; it does not stop anyone
+who can read this executor's workspace, and a local check is a local claim, since
+another script in the same executor could write the same file. A credential that
+cannot be forged or shared has to be issued and verified by the Worker.
 
 ## updating
 

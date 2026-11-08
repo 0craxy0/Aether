@@ -1,6 +1,6 @@
 {
-  "rev": 61,
-  "build": "2026-11-08.61",
-  "notes": "Three more words answer if typed with no text box focused, one of which is a cat; the twelfth time you open the same tab it notices; the search box tells you that you are already using it; 03:33 has an opinion about your sleep; and there are four more commands that ;cmds does not print. Still nothing that changes a setting, touches a module, or leaves the client.",
+  "rev": 62,
+  "build": "2026-11-08.62",
+  "notes": "Remember this device, on the owner panel. Off by default. With it on, the first publish the endpoint actually accepts writes Aether/publish.dkey - the token, the account, the executor and a hardware id where the executor reports one - and a later load reads it, checks the account and device, and unlocks publishing with the box already filled. Nothing is written before a successful call, so a typo is never persisted; if the endpoint ever answers 401 to the stored token the file is deleted and the box cleared, so a rotated token cannot fail silently forever. Forget this device removes it. Being honest about the limit: the file is plaintext and a local check is a local claim - it stops the token being lifted to another account or machine, not someone reading this executor's workspace, and another script in the same executor could write the same file. A credential that cannot be forged or shared has to be issued and verified by the Worker.",
   "loader": "main.lua"
 }

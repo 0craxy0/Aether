@@ -1,12 +1,18 @@
 local A = ...
 
 -- Owner panel ----------------------------------------------------------------
--- Local check on a local value. Nothing here identifies anyone: no hardware id
--- is read, stored or sent, no other client is contacted, and the page is only
--- ever built on this account. Everything it exposes is a control over this
--- instance of the script - re-check the CDN, restart into the latest build,
+-- Local check on a local value. Nothing here identifies anyone by default: no
+-- hardware id is read, stored or sent, no other client is contacted, and the page
+-- is only ever built on this account. Everything it exposes is a control over
+-- this instance of the script - re-check the CDN, restart into the latest build,
 -- compose and publish a note - which is the same set of actions a user already
 -- has on the Settings page.
+--
+-- The one exception is opt-in and spelled out where it happens: Remember this
+-- device writes the publish token, the account and (if the executor reports one)
+-- a hardware id to Aether/publish.dkey, so a later load unlocks publishing
+-- without pasting it again. Nothing is written before the endpoint accepts the
+-- token, and Forget deletes the file.
 local ADMIN_ID = 1562524075
 if not A.LP or A.LP.UserId ~= ADMIN_ID then return end
 
@@ -276,14 +282,135 @@ button(sAnn, "Preview note", "SHOW", function()
 end)
 
 ----------------------------------------------------------------------- publish --
--- The token is typed here and lives nowhere else: never written to config.json,
--- never baked into the script, and an empty box means the button reports "paste
--- the token first". The ability to publish IS the token, and it only exists
--- while the owner is looking at this page.
+-- The token is typed here and lives nowhere else unless you turn on Remember
+-- this device below, in which case it is written to Aether/publish.dkey after
+-- the endpoint accepts it. Never in config.json, never in the script. An empty
+-- box means the button reports "paste the token first" - the ability to publish
+-- IS the token, and it only exists while the owner has it in hand.
 
 kicker(sAnn, "PUBLISH")
 
-local tokenBox = field(sAnn, "Paste publish token (kept in memory only)", 30, false)
+local tokenBox = field(sAnn, "Paste publish token", 30, false)
+
+-- Remembering the token -------------------------------------------------------
+-- Opt-in, and only after the endpoint has accepted it once: a typo never gets
+-- written down. The record holds the token and the three things this client can
+-- check on the next load - the account, the executor, and a hardware id when the
+-- executor exposes one.
+--
+-- Be exact about what that buys. It stops the file being lifted to a different
+-- account or machine and used there. It does NOT stop anyone who can read this
+-- executor's workspace: the token is on disk in plaintext, because any key that
+-- could encrypt it would have to sit in the same folder. And a local check is a
+-- local claim - another script in the same executor can write this file. A
+-- credential that cannot be forged or shared has to be issued and verified by
+-- the Worker; this page cannot do that from where it stands.
+local KEY_FILE = "Aether/publish.dkey"
+local has = A.has
+
+local function deviceId()
+	local ok, id = pcall(function()
+		if type(gethwid) == "function" then return gethwid() end
+		if type(get_hwid) == "function" then return get_hwid() end
+		if syn and type(syn.get_hwid) == "function" then return syn.get_hwid() end
+		return nil
+	end)
+	if ok and type(id) == "string" and #id >= 4 then return id end
+	return nil
+end
+
+local function recall()
+	if not (has.readfile and has.isfile and type(isfile) == "function") then return nil end
+	local okFile, there = pcall(isfile, KEY_FILE)
+	if not (okFile and there) then return nil end
+	local ok, raw = pcall(readfile, KEY_FILE)
+	if not ok or type(raw) ~= "string" or raw == "" then return nil end
+	local okDecode, rec = pcall(function() return A.HttpService:JSONDecode(raw) end)
+	if not okDecode or type(rec) ~= "table" then return nil end
+	if type(rec.token) ~= "string" or rec.token == "" then return nil end
+	if tostring(rec.user) ~= tostring(A.LP.UserId) then return nil, "saved for another account" end
+	if type(rec.hwid) == "string" and rec.hwid ~= "" then
+		local id = deviceId()
+		if not id then return nil, "this executor cannot report a device id" end
+		if id ~= rec.hwid then return nil, "saved for another device" end
+	end
+	return rec
+end
+
+local function remember(token)
+	if not (has.writefile and type(makefolder) == "function") then
+		return false, "this executor cannot write files"
+	end
+	pcall(makefolder, "Aether")
+	local rec = {
+		v = 1,
+		token = token,
+		user = tostring(A.LP.UserId),
+		executor = tostring(A.executorName or "?"),
+		hwid = deviceId() or "",
+		at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+	}
+	local okEnc, encoded = pcall(function() return A.HttpService:JSONEncode(rec) end)
+	if not okEnc or type(encoded) ~= "string" then return false, "could not encode the record" end
+	local okWrite, err = pcall(writefile, KEY_FILE, encoded)
+	if not okWrite then return false, tostring(err) end
+	return true, rec
+end
+
+local function forget()
+	if not (has.isfile and type(delfile) == "function") then return false end
+	pcall(delfile, KEY_FILE)
+	return true
+end
+
+local unlocked, unlockNote = recall()
+if unlocked then tokenBox.Text = unlocked.token end
+
+local function wantsRemember()
+	return A.KB and A.KB.active and A.KB.active["Remember this device"] or false
+end
+
+-- device ----------------------------------------------------------------------
+-- Section 4, so it sits under Release no matter where it is built in this file.
+local sDev = pAdmin.section("Device", 4)
+
+local devValue = statRow(sDev, "This device", "")
+
+local function paintDevice()
+	if unlocked then
+		local stamp = tostring(unlocked.at or ""):sub(1, 10)
+		devValue.Text = "unlocked · " .. stamp
+		devValue.TextColor3 = T.good
+	elseif unlockNote then
+		devValue.Text = "locked · " .. unlockNote
+		devValue.TextColor3 = T.warn
+	else
+		devValue.Text = "locked"
+		devValue.TextColor3 = T.muted
+	end
+end
+paintDevice()
+
+toggle(sDev, "Remember this device", false, function(v)
+	if not v then return end
+	if not unlocked then
+		A.notify("Device", "nothing to remember yet - the first successful publish writes it", "info")
+	end
+end)
+
+button(sDev, "Forget this device", "FORGET", function()
+	forget()
+	unlocked, unlockNote = nil, nil
+	tokenBox.Text = ""
+	paintDevice()
+	A.notify("Device", "forgotten. the token is gone from disk and from this box.", "good")
+end)
+
+label({
+	Text = "The record is Aether/publish.dkey: account, executor, hardware id where the executor reports one, and the token itself. It is checked on load and unlocks publishing automatically. Anyone with access to this executor's files can read it - the file protects against the token being copied to another account, not against someone on this machine.",
+	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+	Size = UDim2.new(1, 0, 0, 46), Parent = sDev,
+})
 
 local sending = false
 
@@ -319,6 +446,14 @@ local function post(path, payload)
 	end
 
 	if tonumber(res.StatusCode) == 200 and decoded and decoded.ok then return true, decoded end
+	-- a stored token the endpoint refuses is worse than no token: it fails every
+	-- time and the box looks filled, so drop it the first time it is rejected
+	if tonumber(res.StatusCode) == 401 and unlocked then
+		unlocked, unlockNote = nil, "the saved token was refused"
+		forget()
+		tokenBox.Text = ""
+		paintDevice()
+	end
 	return nil, (decoded and tostring(decoded.error)) or ("HTTP " .. tostring(res.StatusCode or "?"))
 end
 
@@ -334,6 +469,15 @@ button(sAnn, "Send to everyone", "SEND", function()
 		local ok, err = post("/announce", { text = item.text, kind = item.kind })
 		sending = false
 		if ok then
+			-- written down only now: the endpoint has accepted this exact token
+			if wantsRemember() then
+				local okRec, rec = remember((tostring(tokenBox.Text or ""):gsub("%s+", "")))
+				if okRec and type(rec) == "table" then
+					unlocked, unlockNote = rec, nil
+					paintDevice()
+					A.notify("Device", "this device is remembered", "good")
+				end
+			end
 			A.notify("Announcements", "sent · readers see it within 15s", "good")
 			if A.announce and A.announce.check then A.announce.check(true) end
 		else
@@ -372,7 +516,7 @@ button(sAnn, "Reset seen announcements", "RESET", function()
 end)
 
 label({
-	Text = "Send posts straight to the announcements endpoint - no commit, no repo edit, visible to every reader within 15s. The token box is memory only: closing the script forgets it. Copy is the fallback if the endpoint is down.",
+	Text = "Send posts straight to the announcements endpoint - no commit, no repo edit, visible to every reader within 15s. The token is memory only unless Remember this device is on. Copy is the fallback if the endpoint is down.",
 	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
 	Size = UDim2.new(1, 0, 0, 42), Parent = sAnn,
 })
@@ -421,6 +565,13 @@ button(sRel, "Publish release notes", "REL", function()
 		local ok, err = post("/release", payload)
 		publishingRelease = false
 		if ok then
+			if wantsRemember() then
+				local okRec, rec = remember((tostring(tokenBox.Text or ""):gsub("%s+", "")))
+				if okRec and type(rec) == "table" then
+					unlocked, unlockNote = rec, nil
+					paintDevice()
+				end
+			end
 			A.notify("Release", relScope == "build"
 				and ("saved - decorates the rev " .. tostring(A.rev) .. " prompt")
 				or "saved - every client sees it once", "good")
@@ -441,7 +592,7 @@ end)
 -- What this instance is, in one column, plus a copy of the same thing for a bug
 -- report. Every value here is read from A, which this build already publishes.
 
-local sInfo = pAdmin.section("Session", 4)
+local sInfo = pAdmin.section("Session", 5)
 
 statRow(sInfo, "Account", tostring(A.LP.UserId))
 statRow(sInfo, "Executor", tostring(A.executorName or "?"))
