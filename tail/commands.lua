@@ -243,6 +243,23 @@ end)
 -- an alias so ";help" does not come back as an unknown command
 defs.help = defs.cmds
 
+-- Nothing below is in `order`, so `;cmds` never prints it. They exist for the
+-- person who reads this file: three words that do not belong in a script hub,
+-- which is exactly why they are in one.
+defs.xyzzy = { name = "xyzzy", usage = ";xyzzy", run = function()
+	return true, "nothing happens."
+end }
+
+defs.aether = { name = "aether", usage = ";aether", run = function()
+	return true, string.format("aether · %s · rev %s · %s files in %s ms",
+		tostring(A.build or "?"), tostring(A.rev or "?"),
+		tostring(A.filesLoaded or "?"), tostring(A.loadMs or "?"))
+end }
+
+defs["42"] = { name = "42", usage = ";42", run = function()
+	return true, "the answer, and roughly the odds of finding this."
+end }
+
 ------------------------------------ dispatch ---------------------------------
 
 function CM.run(name, arg)

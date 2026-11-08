@@ -1,6 +1,6 @@
 {
-  "rev": 57,
-  "build": "2026-11-08.57",
-  "notes": "The rebuilt owner panel called button() without keeping it: the file's local header was rewritten and A.button never made it into it, so the page died on its first button instead of building. Every other identifier it uses resolves. The panel now builds as designed - status strip, composer with the segmented kind control and budget bar, release section, session column.",
+  "rev": 58,
+  "build": "2026-11-08.58",
+  "notes": "A few things in this build are not described here, and that is deliberate - a build that lists its own secrets does not have any. They are small, they change no setting, they touch no module, and none of them talks to a network. The rest of the note is the honest part: the owner panel's rebuild from 55 and the loader's commit pinning from 56 are both in this one, so this is the first build where the Admin tab actually opens.",
   "loader": "main.lua"
 }
