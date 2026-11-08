@@ -145,6 +145,9 @@ task.spawn(function()
 				"last: " .. tostring(SG.last or "-"),
 				string.format("unlocked: %s", SG.unlocked and SG.tiers[SG.unlocked] or "unknown"),
 				"cooling: " .. (#cooling > 0 and table.concat(cooling, " · ") or "none"),
+				string.format("server signal: %s", SG.hooked
+					and (SG.lastBurst and string.format("+%d %s", SG.lastBurst.amount, SG.lastBurst.tier) or "listening")
+					or "not found (counter fallback)"),
 			}
 			statusLbl.Text = table.concat(bits, "\n")
 		end

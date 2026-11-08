@@ -63,6 +63,13 @@ local SG = {
 	pads = {},
 	padsReady = false,
 	cashPath = nil,
+	-- server -> client signals (see SG.hook)
+	hooked = false,
+	hookAt = nil,
+	events = {},       -- connections, for teardown
+	eventSeq = 0,      -- bumps on every CashBurst
+	lastBurst = nil,   -- { amount, tier }
+	lastUnlock = nil,  -- { tier, next }
 }
 A.SG = SG
 
@@ -178,6 +185,53 @@ function SG.cash()
 	return nil
 end
 
+-- server signals -------------------------------------------------------------
+-- Nothing the client sends decides a payout. On completion the server fires
+-- three notifications *at* the client:
+--
+--   ObbyUnlocked(tier, next)     which tier is now unlocked        - UI
+--   CashBurst(amount, tier)      show a +N burst                   - UI
+--   TutorialObbyCompleted(tier)  completion toast                  - UI
+--
+-- CashBurst carrying the amount is the tell: a request has no reason to state
+-- its own reward, a display does. So the server watched the character touch the
+-- pad itself, using the replicated position - which is exactly why standing on
+-- the pad is enough, and why the cooldown cannot be rushed from here.
+--
+-- That makes CashBurst the best confirmation available: an amount and a tier
+-- from the server, rather than two leaderstats reads and a subtraction. The
+-- counter is still the fallback, for a client where the hook does not install.
+
+local REMOTE_CASH = "CashBurst"
+local REMOTE_UNLOCK = "ObbyUnlocked"
+
+function SG.hook()
+	if SG.hooked then return end
+	for _, inst in ipairs(game:GetDescendants()) do
+		if inst:IsA("RemoteEvent") or inst:IsA("UnreliableRemoteEvent") then
+			if inst.Name == REMOTE_CASH then
+				SG.events[#SG.events + 1] = inst.OnClientEvent:Connect(function(amount, tier)
+					SG.eventSeq += 1
+					SG.lastBurst = { amount = tonumber(amount) or 0, tier = tostring(tier or "?") }
+				end)
+			elseif inst.Name == REMOTE_UNLOCK then
+				SG.events[#SG.events + 1] = inst.OnClientEvent:Connect(function(tier, next)
+					-- kept raw: the second argument is not documented anywhere and
+					-- guessing at it would make SG.unlocked lie
+					SG.lastUnlock = { tier = tostring(tier or "?"), next = next and tostring(next) or nil }
+				end)
+			end
+		end
+	end
+	SG.hooked = #SG.events > 0
+	SG.hookAt = os.clock()
+	return SG.hooked
+end
+onCleanup(function()
+	for _, conn in ipairs(SG.events) do pcall(function() conn:Disconnect() end) end
+	SG.events = {}
+end)
+
 -- touch ----------------------------------------------------------------------
 
 local function stand(pos, lift)
@@ -198,6 +252,14 @@ function SG.tryTier(tier, timeout)
 	local cooling = SG.ready(tier)
 	if cooling > 0 then return false, 0, string.format("cooling %.1fs", cooling) end
 
+	-- Pick up the server's signal before the attempt that needs it. Scanning the
+	-- DataModel is not free, so it is retried at most every five seconds until it
+	-- lands rather than on every attempt.
+	if not SG.hooked and SG.padsReady and (not SG.hookAt or os.clock() - SG.hookAt > 5) then
+		pcall(SG.hook)
+	end
+
+	local seq = SG.eventSeq
 	local before = SG.cash()
 	local ok, why = stand(entry.pos)
 	if not ok then return false, 0, why end
@@ -205,7 +267,13 @@ function SG.tryTier(tier, timeout)
 	local deadline = os.clock() + (timeout or 2)
 	local delta = 0
 	while os.clock() < deadline do
-		task.wait(0.05)
+		task.wait(0.02)
+		-- CashBurst is the server's own amount: no subtraction, and no chance of
+		-- blaming this pad for something else moving the counter
+		if SG.eventSeq ~= seq then
+			local burst = SG.lastBurst
+			return true, (burst and burst.amount) or 0, nil
+		end
 		local now = SG.cash()
 		if before and now and now > before then
 			delta = now - before

@@ -1,6 +1,6 @@
 {
-  "rev": 46,
-  "build": "2026-11-08.46",
-  "notes": "Send a Global Message: every tier has a cooldown between payouts - Easy 2s, Medium 3s, Hard 5s, Nightmare 8s, Insane 10s - and the farm now waits them out instead of counting them as failures. A refusal on a cooling pad sets that tier's readyAt and the loop sleeps until it expires, so three fast misses can no longer stop a farm that was only waiting; the status block shows the countdown, the pad list shows each cooldown, and a Cooldown padding slider covers a server that is stricter than measured. Insane still wins on cash per second (69 vs 62 for Nightmare), so Auto still settles there.",
+  "rev": 47,
+  "build": "2026-11-08.47",
+  "notes": "Send a Global Message: the payout is confirmed from the server's own signal now. On completion the server fires ObbyUnlocked(tier, next), CashBurst(amount, tier) and TutorialObbyCompleted(tier) at the client - three notifications, one of which carries the amount the server already granted. The farm listens to CashBurst and takes that amount as the result, so an attempt no longer has to diff leaderstats and hope nothing else moved the counter; the counter read stays as the fallback for a client where the hook does not install, and the status block says which one is in use. Nothing here sends anything to the server.",
   "loader": "main.lua"
 }

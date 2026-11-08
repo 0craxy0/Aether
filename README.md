@@ -140,6 +140,16 @@ attribute whose name looks like a currency, so a rename does not break the payou
 check - and a payout that does not move the counter is how a locked tier is
 detected, so the two must agree.
 
+**The payout is confirmed by the server's own signal.** On completion the server
+fires three notifications at the client - `ObbyUnlocked(tier, next)`,
+`CashBurst(amount, tier)` and `TutorialObbyCompleted(tier)` - which is narration,
+not protocol: the amount riding outbound is what a *display* needs, and a request
+has no reason to state its own reward. The server watched the character touch the
+pad itself, using the replicated position, which is why standing on it is enough.
+So the farm listens to `CashBurst` and takes that amount as the result instead of
+diffing the counter, and the counter read stays as the fallback. Nothing in this
+shelf sends anything to the server.
+
 - **Auto-farm cash** stands on the selected tier every *Attempt interval*.
 - **Auto** touches each pad once from Easy up, keeps the highest one that paid,
   and farms that. It is the first thing it does when the switch is turned on and
