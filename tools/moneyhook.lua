@@ -40,20 +40,54 @@ do
 	if prev and type(prev.stop) == "function" then pcall(prev.stop) end
 end
 
-local function findMoney()
+-- The value can be a leaderstats ValueBase (the taxi game) or a player attribute
+-- (Ragdoll Realism keeps Cash on the Player instance, no leaderstats at all), so
+-- the target is a small descriptor with get()/label rather than an Instance.
+local WORDS = { "cash", "money", "coin", "balance", "wallet", "credit", "buck", "bux", "gem", "point" }
+
+local function wordy(name)
+	local n = tostring(name):lower()
+	for _, w in ipairs(WORDS) do
+		if n:find(w, 1, true) then return true end
+	end
+	return false
+end
+
+local function findTarget()
 	local stats = LP:FindFirstChild("leaderstats")
-	if not stats then return nil end
-	local exact = stats:FindFirstChild(CFG.valueName)
-	if exact and exact:IsA("ValueBase") then return exact end
-	for _, c in ipairs(stats:GetChildren()) do
-		if c:IsA("IntValue") or c:IsA("NumberValue") then return c end
+	if stats then
+		local exact = stats:FindFirstChild(CFG.valueName)
+		if exact and exact:IsA("ValueBase") then
+			return { get = function() return exact.Value end, label = exact:GetFullName() }
+		end
+		for _, c in ipairs(stats:GetChildren()) do
+			if c:IsA("IntValue") or c:IsA("NumberValue") then
+				return { get = function() return c.Value end, label = c:GetFullName() }
+			end
+		end
+	end
+
+	local ok, attrs = pcall(function() return LP:GetAttributes() end)
+	if ok and type(attrs) == "table" then
+		local pick
+		for name, v in pairs(attrs) do
+			if type(v) == "number" and (name == CFG.valueName or wordy(name)) then
+				if not pick or name == CFG.valueName then pick = name end
+			end
+		end
+		if pick then
+			return {
+				get = function() return LP:GetAttribute(pick) end,
+				label = LP:GetFullName() .. "[" .. pick .. "]",
+			}
+		end
 	end
 	return nil
 end
 
-local money = findMoney()
+local money = findTarget()
 if not money then
-	return warn("[MoneyHook] no leaderstats value found - run tools/moneyprobe.lua first")
+	return warn("[MoneyHook] no money value and no money-shaped attribute found - run tools/moneyprobe.lua first")
 end
 
 local function summarise(args, count)
@@ -163,7 +197,7 @@ end
 
 ------------------------------------------------------------------- correlation --
 
-local last = money.Value
+local last = money.get()
 
 local function explain(delta, from, to)
 	-- most recent first: the call closest to the change is the likely cause
@@ -200,7 +234,7 @@ end
 task.spawn(function()
 	while running do
 		task.wait(0.1)
-		local v = money.Value
+		local v = money.get()
 		if v ~= last then
 			changes[#changes + 1] = { t = now(), delta = v - last, from = last, to = v }
 			explain(v - last, last, v)
@@ -217,7 +251,7 @@ local module = {
 	stop = function() running = false end,
 	summary = function()
 		print(string.format("[MoneyHook] %s = %s · %d call(s) seen · %d change(s)",
-			money:GetFullName(), tostring(money.Value), #calls, #changes))
+			money.label, tostring(money.get()), #calls, #changes))
 		local byName = {}
 		for _, c in ipairs(calls) do
 			byName[c.name] = (byName[c.name] or 0) + 1
@@ -231,7 +265,7 @@ local module = {
 	end,
 	dump = function()
 		if type(writefile) ~= "function" then return print("[MoneyHook] writefile unavailable") end
-		local data = { place = game.PlaceId, job = game.JobId, value = money:GetFullName(), calls = calls, changes = changes }
+		local data = { place = game.PlaceId, job = game.JobId, value = money.label, calls = calls, changes = changes }
 		local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
 		if not ok then return print("[MoneyHook] could not encode") end
 		pcall(writefile, "Aether/moneyhook.json", encoded)
@@ -241,4 +275,4 @@ local module = {
 getgenv().MoneyHook = module
 
 print(string.format("[MoneyHook] watching %s (%d remote(s) known). Play normally; every change prints the calls before it.",
-	money:GetFullName(), watched))
+	money.label, watched))
