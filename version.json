@@ -1,6 +1,6 @@
 {
-  "rev": 42,
-  "build": "2026-11-07.42",
-  "notes": "Internet Tycoon support is removed entirely: the shelf record, the place id, the detect and forced-profile entries, the loader file list entries, modules/tycoon.lua, pages/tycoon.lua and its README section. The hub is back to the shelves that work: Arsenal, Tesla and Universal.",
+  "rev": 43,
+  "build": "2026-11-08.43",
+  "notes": "A window you resize now stays resized: the size is saved with the rest of the config, and opening a module's gear menu no longer snaps the panel back to 580x430. Load config now rebuilds the pages that are drawn from it (saved Tesla spots). Cursor magnetism puts a leaning control back when you switch it off mid-hover. Section headings carry a hairline, the window edge is a gradient rim, and the cold-gas keybind shows up in the keybind overlay.",
   "loader": "main.lua"
 }

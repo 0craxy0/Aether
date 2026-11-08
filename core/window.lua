@@ -28,7 +28,20 @@ local window = new("CanvasGroup", {
 	BackgroundTransparency = 0.06, BorderSizePixel = 0, Parent = screen,
 })
 corner(window, 11)
-stroke(window, Color3.new(1, 1, 1), 0.86)
+-- A rim that is brightest along the top-left edge and dissolves toward the
+-- bottom-right reads as a lit glass edge; a single flat 1px outline reads as a
+-- drawn box. Same instance, one gradient, and if an executor ignores gradients
+-- on strokes it simply falls back to the old uniform edge.
+local shellStroke = stroke(window, Color3.new(1, 1, 1), 0.72)
+new("UIGradient", {
+	Rotation = 135,
+	Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.5, 0.55),
+		NumberSequenceKeypoint.new(1, 0.95),
+	}),
+	Parent = shellStroke,
+})
 
 -- The shadow sits PAD outside the window, so its curve is the window's radius plus
 -- that inset, which keeps the two arcs concentric. Recomputed on rescale in

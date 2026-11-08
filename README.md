@@ -20,10 +20,14 @@ The panel is built to behave like an object, not a picture:
 - **motion** - pages travel in from the side you came from and their rows settle
   one after another; controls lean toward the cursor
 - **material** - a press leaves a ripple in the row it landed on, and the row
-  under the cursor grows a 2px accent rail on its leading edge
+  under the cursor grows a 2px accent rail on its leading edge; section headings
+  sit on a hairline so a group reads as finished, and the window edge is a
+  gradient rim rather than a flat outline
 - **voice** - one short blip for the whole interface, pitched per intent
 
 All four are switchable on the UI page, and none of them touch a module's state.
+Turning magnetism off mid-hover puts the leaning control back on its row instead
+of leaving it a few pixels off.
 
 Toasts are readable on your own schedule: hovering one holds it open, moving
 away lets it expire, and a click dismisses it immediately.
@@ -136,11 +140,17 @@ on change). The Config section also gives you:
 
 - **Save config** - flush the pending write right now
 - **Load config** - replay the file through every widget, without starting a
-  save in the middle of the read
+  save in the middle of the read; pages whose rows come from the config (saved
+  Tesla spots) are rebuilt afterwards, so the panel matches the file
 - **Copy config** - the exact JSON the file would contain, on the clipboard
 - **Reset all settings** - every row back to the value it was created with, then
   one write; the accent returns to its default through `A.setAccent`, so the
   whole panel repaints rather than only the swatch
+
+The window's own size rides the same file under `Window layout`: drag a corner
+and the size is remembered, so a restart comes back to the panel you left rather
+than to 580x430. It is registered without a row, so it never appears in search,
+and `Reset UI size` writes the default back.
 
 
 ## read aloud
