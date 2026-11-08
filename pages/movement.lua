@@ -4,7 +4,14 @@ local slider, toggle, button = A.slider, A.toggle, A.button
 local new, label, drawX = A.new, A.label, A.drawX
 local T, FONT = A.T, A.FONT
 local fly, charParts, notify = A.fly, A.charParts, A.notify
+-- A page that needs a module must not take the load down when that module is not
+-- there. The shim keeps the rest of Movement usable and says so if you try it.
 local WP = A.waypoints
+if not WP then
+	warn("[Aether] modules/waypoints.lua did not load - waypoints will not save")
+	local function missing() return false, "waypoints module missing" end
+	WP = { list = function() return {} end, save = missing, remove = missing, go = missing }
+end
 
 local pMove = makePage("Movement", 2)
 local cfgFly = makeConfig("Fly")

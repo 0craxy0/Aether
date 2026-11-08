@@ -25,10 +25,18 @@ toggle(sChar2, "Anti-AFK", true, A.setAntiAfk)
 toggle(sChar2, "Anti-void", false, A.setAntiVoid)
 
 -- protection: about other people's scripts, not yours --------------------------
-local sChar3 = pChar.section("Protection", 3)
-toggle(sChar3, "Anti-fling", false, function(v) A.guard.setFling(v) end)
--- Off by default: it cannot tell an attacker from the game teleporting you after
--- a win, and it will fight the second one.
-toggle(sChar3, "Anti-teleport", false, function(v) A.guard.setTeleport(v) end)
-button(sChar3, "Panic: reset and unload", "PANIC", A.guard.panic)
+-- The section exists only when the module behind it does. A page reaching for a
+-- missing module used to raise here and take the whole load down with it, which
+-- is the one failure a guard feature should never cause.
+local guard = A.guard
+if not guard then
+	warn("[Aether] modules/guard.lua did not load - the Protection section is skipped")
+else
+	local sChar3 = pChar.section("Protection", 3)
+	toggle(sChar3, "Anti-fling", false, function(v) guard.setFling(v) end)
+	-- Off by default: it cannot tell an attacker from the game teleporting you
+	-- after a win, and it will fight the second one.
+	toggle(sChar3, "Anti-teleport", false, function(v) guard.setTeleport(v) end)
+	button(sChar3, "Panic: reset and unload", "PANIC", function() guard.panic() end)
+end
 

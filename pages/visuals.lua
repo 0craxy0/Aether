@@ -10,7 +10,11 @@ toggle(sVis, "Remove fog", false, A.setNoFog)
 toggle(sVis, "Disable particles", false, A.setNoParticles)
 -- effects and environment lighting only: fog and shadows belong to the two rows
 -- above, and two switches owning one property means the last one off wins
-toggle(sVis, "Low graphics", false, function(v) A.world.lowGraphics(v) end)
+if A.world then
+	toggle(sVis, "Low graphics", false, function(v) A.world.lowGraphics(v) end)
+else
+	warn("[Aether] modules/world.lua did not load - Low graphics is skipped")
+end
 
 local sVis2 = pVis.section("Camera", 2)
 slider(sVis2, "Field of view", 40, 120, 70, function(v)

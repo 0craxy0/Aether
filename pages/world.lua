@@ -5,6 +5,14 @@ local toggle, slider, button = A.toggle, A.slider, A.button
 local W = A.world
 local PAGE = "World"
 
+-- Every row on this page comes from the module, so without it there is nothing
+-- worth drawing. Say which file is missing and build no page, rather than raise
+-- and roll the whole hub's load back.
+if not W then
+	warn("[Aether] modules/world.lua did not load - the World page is skipped")
+	return
+end
+
 local pW = A.makePage(PAGE, 5)
 
 -- find & teleport ---------------------------------------------------------------

@@ -1,6 +1,6 @@
 {
-  "rev": 48,
-  "build": "2026-11-08.48",
-  "notes": "Universal tools. Waypoints save a named position into the config and put you back on it, with the distance shown before you jump. World finds any part or model in Workspace by name and teleports to it, highlights the ones you care about through the Drawing API, and prints this server's id, age, ping and player count. Low graphics stops the effects and the environment lighting when the device is struggling. Character gains anti-fling and anti-teleport, and End resets you and unloads the hub in one press. Settings gains named profiles: the same config file, saved under a name, so a whole panel state comes back in one click. Anchor, speed and jump now survive a respawn instead of being lost to the reset.",
+  "rev": 49,
+  "build": "2026-11-08.49",
+  "notes": "A page can no longer take the whole load down by reaching for a module that is not there. Character, Movement, Visuals and World now check for their module first: the Protection section, the Waypoints section, Low graphics and the whole World page are skipped with a console line naming the file that did not load, instead of raising at build time and rolling the hub back. This is what a stale, executor-cached loader looked like from the outside - a new page against a file list that had never heard of modules/guard.lua. If you see one of those lines, run once with getgenv().AetherFresh = true.",
   "loader": "main.lua"
 }
