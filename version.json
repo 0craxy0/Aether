@@ -1,6 +1,6 @@
 {
-  "rev": 56,
-  "build": "2026-11-08.56",
-  "notes": "Every stage file is now fetched from a commit-pinned path, not a branch path with a changing query string. The loader asks api.github.com which commit main is on once at startup, then loads <repo>/<sha>/core/..., which is a path no cache has ever seen. The rev query alone was not enough: a cache that keys by path treated tail/admin.lua?v=55 and ?v=54 as the same entry, so the header could say 55 while a page came back from the previous build. If the ref lookup fails the plain base is used, so an offline or rate-limited client still loads, just without the guarantee. Set getgenv().AetherDebug to see which base was chosen.",
+  "rev": 57,
+  "build": "2026-11-08.57",
+  "notes": "The rebuilt owner panel called button() without keeping it: the file's local header was rewritten and A.button never made it into it, so the page died on its first button instead of building. Every other identifier it uses resolves. The panel now builds as designed - status strip, composer with the segmented kind control and budget bar, release section, session column.",
   "loader": "main.lua"
 }
