@@ -21,7 +21,7 @@ local KB = {
 	bindings = {},     -- bind name -> { clear }, so a key can only belong to one row
 	binds = { ["Fly"] = "Toggle fly", ["Aimbot"] = "Toggle aimbot", ["Silent aim"] = "Toggle silent aim", ["Kill aura"] = "Toggle kill aura" },
 }
-for i, n in ipairs({ "Fly", "Aimbot", "Silent aim", "Kill aura", "Player ESP", "Noclip", "Infinite jump", "Fullbright", "Remove fog", "Disable particles", "Anti-AFK", "Auto-execute on teleport" }) do
+for i, n in ipairs({ "Fly", "Aimbot", "Silent aim", "Kill aura", "Player ESP", "Noclip", "Infinite jump", "Fullbright", "Remove fog", "Disable particles", "Anti-AFK", "Auto-execute on teleport", "Infinite cold gas" }) do
 	KB.index[n] = i
 end
 KB.opts = { sliderRelease = true }
@@ -139,9 +139,9 @@ function A.slider(parent, name, min, max, default, onChanged)
 	corner(r, 7)
 
 	label({ Text = name, Font = FONT.med, TextSize = 12, Position = UDim2.fromOffset(11, 8), Size = UDim2.new(1, -112, 0, 14), Parent = r })
-	local val = label({ Text = tostring(default), Font = FONT.bold, TextSize = 12, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Right, Position = UDim2.new(1, -60, 0, 8), Size = UDim2.fromOffset(49, 14), Parent = r })
-	accentLinks[#accentLinks + 1] = { obj = val, kind = "text" }
-	val.Visible = false
+	-- One value display, not two: the old pair left an invisible label sitting
+	-- behind the editable box and registered it as an accent link, so every
+	-- accent change repainted a label nobody could see.
 	local valBox = new("TextBox", {
 		Text = tostring(default), Font = FONT.bold, TextSize = 12, TextColor3 = T.accent,
 		TextXAlignment = Enum.TextXAlignment.Right, BackgroundTransparency = 1, ClearTextOnFocus = false,
@@ -205,7 +205,6 @@ function A.slider(parent, name, min, max, default, onChanged)
 		local a = math.clamp((value - min) / span, 0, 1)
 		tween(fill, 0.08, { Size = UDim2.fromScale(a, 1) })
 		tween(knob, 0.08, { Position = UDim2.fromScale(a, 0.5) })
-		val.Text = tostring(value)
 		if not valBox:IsFocused() then valBox.Text = tostring(value) end
 		if not silent then queueCommit() end
 	end

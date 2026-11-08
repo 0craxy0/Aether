@@ -127,8 +127,22 @@ local function magnetStep(dt)
 	end
 end
 
+-- Magnetism can be switched off while a control is leaning (the UI page's
+-- "Cursor magnetism" row, or "Entrance motion" above it). The heartbeat used to
+-- return early in that state, which froze the lean where it was: a control left
+-- a few pixels off its row until it was hovered again. Put it back instead.
+local function settle()
+	for _, it in ipairs(M.items) do
+		if it.ox ~= 0 or it.oy ~= 0 then
+			it.ox, it.oy = 0, 0
+			if it.obj.Parent then it.obj.Position = it.base end
+		end
+	end
+end
+
 local conn = RunService.Heartbeat:Connect(function(dt)
-	if #M.items == 0 or not M.enabled or not M.magnetOn then return end
+	if not (M.enabled and M.magnetOn) then settle(); return end
+	if #M.items == 0 then return end
 	if not (window.Visible and window.GroupTransparency < 0.98) then return end
 	magnetStep(math.min(dt, 1 / 30))
 end)
