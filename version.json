@@ -1,6 +1,6 @@
 {
-  "rev": 66,
-  "build": "2026-11-08.66",
-  "notes": "Downgrading, in Settings > Updates. Type a rev or a commit and the client reloads onto that build; Return to latest clears it. The pin is written to the config, so it survives a reload, and the teleport queue re-runs the pinned commit instead of the branch - a downgrade that reverted on the next teleport would not be one. Revs are resolved from the commit messages, since \"(rev 64)\" is the only place a build proves which rev it is; one call for the last hundred commits covers every build so far. Update prompts stay quiet while pinned, and a pin whose build cannot be downloaded is dropped on the spot rather than bricking every later launch. The player card's gap from 65 rides along.",
+  "rev": 67,
+  "build": "2026-11-08.67",
+  "notes": "Downgrading, in Settings > Updates (67 fixes a `local U.field` in 66 that would not parse). Type a rev or a commit and the client reloads onto that build; Return to latest clears it. The pin is written to the config, so it survives a reload, and the teleport queue re-runs the pinned commit instead of the branch - a downgrade that reverted on the next teleport would not be one. Revs are resolved from the commit messages, since \"(rev 64)\" is the only place a build proves which rev it is; one call for the last hundred commits covers every build so far. Update prompts stay quiet while pinned, and a pin whose build cannot be downloaded is dropped on the spot rather than bricking every later launch. The player card's gap from 65 rides along.",
   "loader": "main.lua"
 }

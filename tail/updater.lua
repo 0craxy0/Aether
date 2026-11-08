@@ -295,7 +295,7 @@ end
 -- ("... (rev 64)"), because that is the only place a build can prove which rev
 -- it is. One request for the last hundred commits is enough to map every rev
 -- this project has ever shipped to the commit that carries it.
-local U.indexCache, U.indexAt = nil, 0
+local indexCache, indexAt = nil, 0
 
 local function commitsUrl()
 	local base = A.rawBase
@@ -305,7 +305,7 @@ local function commitsUrl()
 end
 
 local function revIndex()
-	if U.indexCache and os.clock() - U.indexAt < 120 then return U.indexCache end
+	if indexCache and os.clock() - indexAt < 120 then return indexCache end
 	local url = commitsUrl()
 	if not url then return nil, "this build does not know its repo" end
 	local ok, body = pcall(game.HttpGet, game, url .. "&t=" .. tostring(os.time()))
@@ -320,7 +320,7 @@ local function revIndex()
 			if rev then map[tonumber(rev)] = c.sha end
 		end
 	end
-	U.indexCache, U.indexAt = map, os.clock()
+	indexCache, indexAt = map, os.clock()
 	return map
 end
 
