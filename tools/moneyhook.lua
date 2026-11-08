@@ -32,6 +32,14 @@ local calls = {}    -- { t, dir, name, args }
 local changes = {}  -- { t, delta, from, to }
 local running = true
 
+-- Running it twice is easy to do by accident, and two samplers print every change
+-- twice with different call lists, which reads as a mystery. A new instance retires
+-- the old one.
+do
+	local prev = getgenv().MoneyHook
+	if prev and type(prev.stop) == "function" then pcall(prev.stop) end
+end
+
 local function findMoney()
 	local stats = LP:FindFirstChild("leaderstats")
 	if not stats then return nil end
