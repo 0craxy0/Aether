@@ -24,12 +24,15 @@ local CFG = {
 	keywords = {
 		"cash", "money", "coin", "balance", "wallet", "credit", "dollar", "earn",
 		"bank", "fund", "pay", "salary", "tip", "fare", "revenue", "profit",
-		"income", "token", "buck", "worth", "balance",
+		"income", "token", "buck", "worth", "bux", "gem", "point", "tix",
 	},
 	-- a sweep of every descendant is the thorough answer and a slow one; the
 	-- default scan is players, ReplicatedStorage, Workspace's first two levels and
 	-- the player's own GUI, which is where a client mirror lives if it exists
 	deepScan = false,
+	-- every numeric value and attribute on the player is listed even when its name
+	-- matches nothing: on a game nobody has probed yet, "Coins" might be "Bux"
+	listAllOnPlayer = true,
 	pollHz = 10,
 	watchSeconds = 90,
 	maxRemoteLines = 120,
@@ -104,21 +107,26 @@ local function addEntry(inst, kind, attr)
 	}
 end
 
-local function scanInstance(inst, depth, inStats)
+local function scanInstance(inst, depth, inStats, anyName)
 	if not inst or not inst.Parent then return end
 	local ok, cls = pcall(function() return inst.ClassName end)
 	if ok and cls then
 		local numeric = (cls == "IntValue" or cls == "NumberValue"
 			or cls == "DoubleConstrainedValue" or cls == "IntConstrainedValue")
 		-- inside leaderstats a value is a statistic whatever it is called, so the
-		-- name filter only applies to values found anywhere else
-		if numeric and (inStats or matches(inst.Name)) then
-			addEntry(inst, "value")
+		-- name filter only applies to values found anywhere else. anyName is the
+		-- "I have never seen this game, show me everything numeric" pass.
+		if numeric then
+			local named = inStats or matches(inst.Name)
+			if named or anyName then addEntry(inst, named and "value" or "other") end
 		end
 		local okAttr, attrs = pcall(function() return inst:GetAttributes() end)
 		if okAttr and type(attrs) == "table" then
 			for name, v in pairs(attrs) do
-				if type(v) == "number" and (matches(name) or inStats) then addEntry(inst, "attribute", name) end
+				if type(v) == "number" then
+					local named = inStats or matches(name)
+					if named or anyName then addEntry(inst, named and "attribute" or "other", name) end
+				end
 			end
 		end
 	end
@@ -127,7 +135,7 @@ local function scanInstance(inst, depth, inStats)
 	if not okKids or not kids then return end
 	local childInStats = inStats or inst.Name == "leaderstats"
 	for _, child in ipairs(kids) do
-		scanInstance(child, depth - 1, childInStats)
+		scanInstance(child, depth - 1, childInStats, anyName)
 	end
 end
 
@@ -150,11 +158,13 @@ end
 
 local function scan()
 	entries, seen = {}, {}
-	scanInstance(LP, 4, false)
-	scanInstance(ReplicatedStorage, CFG.deepScan and 999 or 2, false)
+	-- the player first, and with the name filter off: a game that calls its money
+	-- "Bux" or "R$" would otherwise produce an empty report
+	scanInstance(LP, 4, false, CFG.listAllOnPlayer ~= false)
+	scanInstance(ReplicatedStorage, CFG.deepScan and 999 or 2, false, false)
 	-- one level of Workspace: enough to catch a Values folder, cheap enough not to
 	-- walk a whole city
-	scanInstance(game:GetService("Workspace"), CFG.deepScan and 999 or 1, false)
+	scanInstance(game:GetService("Workspace"), CFG.deepScan and 999 or 1, false, false)
 	if CFG.deepScan then
 		for _, d in ipairs(game:GetDescendants()) do
 			if d:IsA("ValueBase") and matches(d.Name) then addEntry(d, "value") end
@@ -169,7 +179,13 @@ end
 local remoteLines = {}
 
 local function report(all)
-	local list = entries
+	-- named candidates are the answer; unnamed ones are the shortlist for a game
+	-- whose currency is called something nobody would guess
+	local named, other = {}, {}
+	for _, e in ipairs(entries) do
+		if e.kind == "other" then other[#other + 1] = e else named[#named + 1] = e end
+	end
+	local list = named
 	local limit = all and #list or math.min(#list, CFG.maxPrint)
 	print(string.rep("=", 64))
 	print("[MoneyProbe] place " .. tostring(game.PlaceId) .. " · " .. tostring(game.JobId))
@@ -192,6 +208,15 @@ local function report(all)
 	end
 
 	local gui = guiMoney()
+	if #other > 0 then
+		print(string.format("[MoneyProbe] %d other number(s) on you (no money-ish name - check these by hand):", #other))
+		for i = 1, math.min(#other, 12) do
+			local e = other[i]
+			print(string.format("  · %14s  %-9s %s", tostring(e.value), e.kind, e.path))
+		end
+		if #other > 12 then print(string.format("  ... %d more", #other - 12)) end
+	end
+
 	if #gui > 0 then
 		print("[MoneyProbe] currency-looking labels on screen:")
 		for i = 1, math.min(#gui, 8) do
