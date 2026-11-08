@@ -97,10 +97,16 @@ function A.colorPicker(parent, name, defaultColor, onChanged, legacyNames)
 		Visible = false, Parent = row,
 	}, { new("UICorner", { CornerRadius = UDim.new(0, 6) }) })
 
+	-- Both overlays carry the same corner as the container. ClipsDescendants
+	-- clips to the rectangle, not to the rounded shape, so a square overlay paints
+	-- straight over the parent's corners and the square reads as sharp on three
+	-- sides - the one visible round corner is the parent peeking out.
+	local RADIUS = UDim.new(0, 6)
+
 	local wash = new("Frame", {
 		Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(1, 1, 1),
 		BorderSizePixel = 0, Parent = square,
-	})
+	}, { new("UICorner", { CornerRadius = RADIUS }) })
 	new("UIGradient", {
 		Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.new(1, 1, 1)),
 		Transparency = NumberSequence.new({
@@ -113,12 +119,15 @@ function A.colorPicker(parent, name, defaultColor, onChanged, legacyNames)
 	local shade = new("Frame", {
 		Size = UDim2.fromScale(1, 1), BackgroundColor3 = Color3.new(0, 0, 0),
 		BorderSizePixel = 0, Parent = square,
-	})
+	}, { new("UICorner", { CornerRadius = RADIUS }) })
 	new("UIGradient", {
 		Rotation = 90,
+		-- 1 at the top, 0 at the bottom: value runs bright-to-dark downward, and
+		-- the shade is what darkens it. Written the other way round the square
+		-- was lit from the bottom edge.
 		Transparency = NumberSequence.new({
-			NumberSequenceKeypoint.new(0, 0),
-			NumberSequenceKeypoint.new(1, 1),
+			NumberSequenceKeypoint.new(0, 1),
+			NumberSequenceKeypoint.new(1, 0),
 		}),
 		Parent = shade,
 	})

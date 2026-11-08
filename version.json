@@ -1,6 +1,6 @@
 {
-  "rev": 69,
-  "build": "2026-11-08.69",
-  "notes": "Downgrading, in Settings > Updates (69: a rollback now rewrites the fetched loader's stage base, so a rolled-back client runs one whole old build instead of an old main.lua over new files).. Type a rev or a commit and the client reloads onto that build; Return to latest clears it. The pin is written to the config, so it survives a reload, and the teleport queue re-runs the pinned commit instead of the branch - a downgrade that reverted on the next teleport would not be one. Revs are resolved from the commit messages, since \"(rev 64)\" is the only place a build proves which rev it is; one call for the last hundred commits covers every build so far. Update prompts stay quiet while pinned, and a pin whose build cannot be downloaded is dropped on the spot rather than bricking every later launch. The player card's gap from 65 rides along.",
+  "rev": 70,
+  "build": "2026-11-08.70",
+  "notes": "The accent picker's square was lit from the bottom edge, and only one of its corners was round. The black shade overlay had its transparency the wrong way up, so value ran dark-to-light downward instead of light-to-dark; and the two colour overlays painted straight over the container's rounded corners, because ClipsDescendants clips to the rectangle and not to the UICorner shape - the one round corner you could see was the parent peeking out past a square overlay. Both overlays now carry the same radius, and the gradient runs the right way up. Downgrading from 66 is unchanged and included.",
   "loader": "main.lua"
 }
