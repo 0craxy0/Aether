@@ -14,18 +14,17 @@ local plrList = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enu
 local refreshPlayers
 do
 	local PV = { plr = nil, open = false, query = "", marks = {}, spectating = nil, flinging = false, flingConn = nil, btns = {} }
-	-- The card used to be a fixed 214x318, which was only ever right at the
-	-- default window size: with "Scale UI contents" off the window grows in real
-	-- pixels while the contents do not, so the card sat there at its old size
-	-- against a much bigger panel. Deriving it from the logical window size makes
-	-- both modes agree - scaled, A.W/H stay put and the UIScale does the growing;
-	-- unscaled, they grow and the card grows with them.
-	local function panelSize()
-		local w = math.clamp(math.floor((A.W or 580) * 0.37), 190, 400)
-		local h = math.clamp(math.floor((A.H or 430) * 0.74), 240, 470)
-		return w, h
+	-- The card is 214x318 and always has been; what changes is how far it is
+	-- zoomed. Stretching it to follow the window put a dead band between the name
+	-- and the close button, because the contents do not stretch with it - the
+	-- card is a sidebar, not a page. A uniform zoom of the whole thing keeps the
+	-- proportions the design was drawn at, and still answers "make it bigger".
+	local BASE_W, BASE_H = 214, 318
+	local function panelZoom()
+		local zx = (A.W or 580) / 580
+		local zy = (A.H or 430) / 430
+		return math.clamp(math.min(zx, zy), 0.75, 1.8)
 	end
-	local PW, PH = panelSize()
 
 	local psFrame = new("Frame", {
 		Size = UDim2.new(1, 0, 0, 30), LayoutOrder = -1, BackgroundColor3 = T.panel, BorderSizePixel = 0, Parent = sPlr,
@@ -37,7 +36,7 @@ do
 	})
 
 	local panel = new("CanvasGroup", {
-		AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(PW, PH), BackgroundColor3 = T.bg,
+		AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(BASE_W, BASE_H), BackgroundColor3 = T.bg,
 		BackgroundTransparency = 0.03, BorderSizePixel = 0, GroupTransparency = 1, Visible = false, Parent = screen,
 	})
 	corner(panel, 11)
@@ -209,12 +208,12 @@ do
 		end)
 		refreshButtons()
 		panel.Visible = true
-		-- target size is read at open time, and the heartbeat leaves it alone while
-		-- the elastic tween is still running
-		local w, h = panelSize()
-		panel.Size = UDim2.fromOffset(w * 0.7, h * 0.7)
+		-- the card zooms rather than resizes, so the entrance is a scale tween and
+		-- the heartbeat keeps its hands off the scale until it lands
 		PV.animating = true
-		tween(panel, 0.8, { Size = UDim2.fromOffset(w, h) }, Enum.EasingStyle.Elastic)
+		local target = uiScales[1].Scale * panelZoom()
+		pScale.Scale = target * 0.7
+		tween(pScale, 0.8, { Scale = target }, Enum.EasingStyle.Elastic)
 		tween(panel, 0.22, { GroupTransparency = 0 })
 		task.delay(0.85, function() PV.animating = false end)
 	end
@@ -237,20 +236,18 @@ do
 
 	local pvConn = RunService.Heartbeat:Connect(function()
 		local ap, as = window.AbsolutePosition, window.AbsoluteSize
-		pScale.Scale = uiScales[1].Scale
+		-- zoom, not size: the card keeps its 214x318 proportions and grows whole,
+		-- so the gap between the name and the close button never opens up
+		if not PV.animating then
+			pScale.Scale = uiScales[1].Scale * panelZoom()
+		end
 		if PV.open then
 			panel.Visible = window.Visible and A.activeTab == "Players"
 			local vp = screen.AbsoluteSize
-			local w, h = panelSize()
-			local pw = w * pScale.Scale
+			local pw = BASE_W * pScale.Scale
 			local x = ap.X + as.X + 10
 			if x + pw > vp.X then x = math.max(ap.X - pw - 10, 4) end
 			panel.Position = UDim2.fromOffset(x, ap.Y + as.Y / 2)
-			-- follow a resize: compare in on-screen pixels, because AbsoluteSize
-			-- already includes the panel's own UIScale
-			if not PV.animating and math.abs(panel.AbsoluteSize.X - pw) > 1 then
-				panel.Size = UDim2.fromOffset(w, h)
-			end
 		end
 		local _, _, mine = charParts()
 		for plr, m in pairs(PV.marks) do
