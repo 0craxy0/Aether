@@ -93,16 +93,20 @@ local function candidates()
 	local function add(model, byFolder)
 		if not model or model == me or seenModel[model] then return end
 		if Players:GetPlayerFromCharacter(model) then return end
-		local hum = humOf(model)
-		if not hum or hum.Health <= 0 then return end
 		local part = partOf(model)
 		if not part then return end
+		local hum = humOf(model)
+		-- The folder's dummies have no Humanoid at all. This game keeps their state
+		-- in attributes - Consciousness, BloodMl, Condition, Status - so a rig is
+		-- optional and "dead" means something else entirely (see isDown).
+		if hum and hum.Health <= 0 then return end
+		if not hum and not byFolder and not CFG.includeLoose then return end
 		local dist = origin and (part.Position - origin).Magnitude or 0
 		if dist > CFG.maxRange then return end
 		seenModel[model] = true
 		out[#out + 1] = {
 			model = model, hum = hum, part = part, dist = dist,
-			folder = byFolder, rig = hum.Parent and hum.Parent.Name or "?",
+			folder = byFolder, rig = (hum and hum.Parent and hum.Parent.Name) or "no rig",
 		}
 	end
 
@@ -157,6 +161,30 @@ local function aimAt(part)
 	cam.CFrame = CFrame.lookAt(from, to)
 end
 
+-- What "dead" means here. There is no Health: the model carries Consciousness
+-- (100 → 0), BloodMl (5000 and falling), Condition/Status strings, and a Summary
+-- written by the game's own medical simulation. Any of those leaving the healthy
+-- range counts as a hit we can see, which is what the cash is paid for.
+local function snapshot(model)
+	local c = model:GetAttribute("Consciousness")
+	local b = model:GetAttribute("BloodMl")
+	local s = model:GetAttribute("Status")
+	return string.format("cons %s · blood %s · %s",
+		tostring(c == nil and "?" or math.floor(c)),
+		tostring(b == nil and "?" or math.floor(b)),
+		tostring(s or "?"))
+end
+
+local function isDown(model)
+	local c = model:GetAttribute("Consciousness")
+	if type(c) == "number" and c < 100 then return true end
+	local s = model:GetAttribute("Status")
+	if type(s) == "string" and s ~= "Conscious" and s ~= "" then return true end
+	local b = model:GetAttribute("BloodMl")
+	if type(b) == "number" and b < 5000 then return true end
+	return false
+end
+
 local function dumpFolder()
 	local folder = dummyFolder()
 	if not folder then
@@ -192,9 +220,7 @@ local function scan()
 	print(string.format("[KillAll] %d target(s) within %d studs · %s", #list, CFG.maxRange, where))
 	for i = 1, math.min(#list, 20) do
 		local t = list[i]
-		print(string.format("  %2d. %-16s rig %-14s hp %5.0f/%-5.0f %3.0f studs  %s",
-			i, t.model.Name:sub(1, 16), t.rig:sub(1, 14),
-			t.hum.Health, t.hum.MaxHealth, t.dist, t.folder and "folder" or "Dummy*"))
+		print(string.format("  %2d. %-10s %3.0f studs  %s", i, t.model.Name:sub(1, 10), t.dist, snapshot(t.model)))
 	end
 	if #list == 0 then
 		-- The folder is there but nothing in it answered to Humanoid. Print what is
@@ -225,13 +251,14 @@ local function killOne(target, tool)
 	state.stopAt = os.clock() + CFG.perTarget
 
 	while os.clock() < state.stopAt and state.running do
-		if not target.hum.Parent or target.hum.Health <= 0 then break end
+		if not target.model.Parent then break end
+		if isDown(target.model) then break end
 		local c = LP.Character
 		if not c then break end
 		local t = c:FindFirstChildOfClass("Tool") or tool
 		if not t then break end
 
-		aimAt(target.hum.Parent:FindFirstChild("Head") or target.part)
+		aimAt(target.part)
 		task.wait(CFG.aimSettle)
 		pcall(function() t:Activate() end)
 		task.wait(CFG.fireEvery)
@@ -239,7 +266,7 @@ local function killOne(target, tool)
 
 	local after = cash()
 	local took = os.clock() - started
-	return target.hum.Health <= 0, (after and before) and (after - before) or 0, took
+	return isDown(target.model), (after and before) and (after - before) or 0, took
 end
 
 local function run()
@@ -264,18 +291,19 @@ local function run()
 
 	for i, target in ipairs(list) do
 		if not state.running then break end
-		if not target.hum.Parent or target.hum.Health <= 0 then
+		if not target.model.Parent or isDown(target.model) then
 			-- already down (someone else, or a previous pass): not a failure
 			killed = killed + 1
 		else
 			local ok, delta, took = killOne(target, tool)
 			if ok then
 				killed = killed + 1
-				print(string.format("  %2d/%d  %s  %.1fs  %+d", i, #list, target.model.Name:sub(1, 20), took, delta))
+				print(string.format("  %2d/%d  %-10s %.1fs  %+d   %s", i, #list,
+					target.model.Name:sub(1, 10), took, delta, snapshot(target.model)))
 			else
 				missed = missed + 1
-				print(string.format("  %2d/%d  %s  %.1fs  still %.0f hp", i, #list,
-					target.model.Name:sub(1, 20), took, target.hum.Health))
+				print(string.format("  %2d/%d  %-10s %.1fs  unchanged   %s", i, #list,
+					target.model.Name:sub(1, 10), took, snapshot(target.model)))
 			end
 		end
 	end
