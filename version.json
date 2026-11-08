@@ -1,6 +1,6 @@
 {
-  "rev": 50,
-  "build": "2026-11-08.50",
-  "notes": "Commands, and a faster frame. One parser behind two doors: the game's own chat (public - the message is sent before Chatted fires, so everyone sees it) and a field in Settings that sends nothing. ;tp ;save ;wp ;del ;find ;go ;hl ;lowg ;info ;fly ;ws ;jp ;infjump ;noclip ;anchor ;unanchor ;profile ;profiles ;panic ;cmds, with a configurable prefix. Numeric and toggle commands go through the widget that owns the row, so the panel cannot disagree with them. Text input rows were drawing their label through the middle of the field; they are two-line now, with a focus ring that follows the accent. ESP stops doing per-frame work it does not need: character parts are cached against the model, distance is compared squared, colours are computed once per frame instead of once per player, rainbow is one colour per frame, off-screen sets are hidden once instead of every frame, and text is only reassigned when the string actually changes. Object highlight keeps its Drawing objects across rescans instead of destroying and rebuilding them, keybind text updates at 10Hz behind the same hidden-window gate as the depth drift and the cursor magnetism, and magnetism only settles on the frame it is switched off.",
+  "rev": 51,
+  "build": "2026-11-08.51",
+  "notes": "The new text row passed its TextBox as the third argument to new(), which is the child list, so ipairs was handed an Instance and the Movement page died on build. Fixed - the stroke is parented through its props now. new() also accepts a single Instance in that position instead of raising about tables, since every occurrence of this mistake looks the same from the outside: a page failing on a line in core/util.lua that names nothing useful.",
   "loader": "main.lua"
 }

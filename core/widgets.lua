@@ -330,9 +330,12 @@ function A.input(parent, name, placeholder, onCommit, defaultText)
 	})
 	-- the field is the only part of the row that takes a click, so it is the one
 	-- that has to say "you are typing here" - a focused box is otherwise identical
+	-- parent goes in the props table: the third argument of new() is a list of
+	-- children, so passing the box there hands ipairs an Instance
 	local stroke = new("UIStroke", {
-		Color = T.stroke, Thickness = 1, Transparency = 0.55, ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
-	}, box)
+		Color = T.stroke, Thickness = 1, Transparency = 0.55,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = box,
+	})
 	accentLinks[#accentLinks + 1] = { obj = stroke, kind = "stroke" }
 
 	local function commit()

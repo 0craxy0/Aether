@@ -6,6 +6,10 @@ function A.new(class, props, children)
 	for k, v in pairs(props or {}) do
 		if k ~= "Parent" then o[k] = v end
 	end
+	-- a bare Instance here used to reach ipairs and raise a message about tables
+	-- that named neither the widget nor the page; accept it as the single child
+	-- it obviously is
+	if children and typeof(children) == "Instance" then children = { children } end
 	for _, c in ipairs(children or {}) do c.Parent = o end
 	if props and props.Parent then o.Parent = props.Parent end
 	return o
