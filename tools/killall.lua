@@ -24,7 +24,7 @@ local LP = Players.LocalPlayer
 
 local CFG = {
 	maxRange = 400,      -- studs; dummies further than this are skipped
-\tperTarget = 2.5,     -- seconds before giving up on one target
+	perTarget = 2.5,     -- seconds before giving up on one target
 	fireEvery = 0.12,    -- seconds between Activate() calls
 	aimSettle = 0.05,    -- let the gun notice the new aim before firing
 }
