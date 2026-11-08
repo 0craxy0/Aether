@@ -19,6 +19,9 @@ local notify, onCleanup = A.notify, A.onCleanup
 local WORDS = {
 	kernel = "you read the source. respect.",
 	sudo = "user is not in the sudoers file. this incident will be reported.",
+	meow = "purr.",
+	hack = "this is not a hack, it is an automation. there is a difference, and a lawyer.",
+	gg = "gg. but nothing ended.",
 }
 local buf, lastAt = "", 0
 
@@ -158,12 +161,44 @@ if A.searchBox then
 end
 
 -- 7. the clock -------------------------------------------------------------
--- One minute a day, at 04:20 local time, the panel says so. Once, and only on a
--- client that happens to load in that minute.
+-- Two minutes a day, by the local clock: one a joke about the hour, one a
+-- verdict on why anyone is awake to see it.
 task.spawn(function()
 	task.wait(1.5)
 	local t = os.date("*t")
 	if t.hour == 4 and t.min == 20 then
 		notify("Aether", "4:20. nice.", "good")
+	elseif t.hour == 3 and t.min == 33 then
+		notify("Aether", "3:33. go to bed. the obbies will still be there.", "info")
 	end
 end)
+
+-- 8. the visit -------------------------------------------------------------
+-- The twelfth time you open the same tab, the panel notices. Twelve is high
+-- enough that it is not a mis-click, low enough that someone will hit it.
+local visits, seenPage = {}, nil
+A.onPage(function(name)
+	if name == seenPage then return end
+	seenPage = name
+	visits[name] = (visits[name] or 0) + 1
+	if visits[name] == 12 then
+		notify("Aether", "twelfth visit to " .. tostring(name) .. ". it is the same page.", "info")
+	end
+end)
+
+-- 9. the other field -------------------------------------------------------
+-- A word that answers before anyone has asked anything.
+local saidAether = false
+if A.searchBox then
+	local selfConn = A.searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+		local q = tostring(A.searchBox.Text or ""):lower():gsub("%s+$", "")
+		if q == "aether" then
+			if saidAether then return end
+			saidAether = true
+			notify("Aether", "you are already using it.", "good")
+		elseif q == "" then
+			saidAether = false
+		end
+	end)
+	onCleanup(function() selfConn:Disconnect() end)
+end

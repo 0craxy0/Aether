@@ -280,6 +280,22 @@ defs.hello = { name = "hello", usage = ";hello", run = function()
 	return true, "hello, world."
 end }
 
+defs.ez = { name = "ez", usage = ";ez", run = function()
+	return true, "it was not easy. it was a script."
+end }
+
+defs.afk = { name = "afk", usage = ";afk", run = function()
+	return false, "you are not away. you are here, typing commands into a hub."
+end }
+
+defs.bed = { name = "bed", usage = ";bed", run = function()
+	return true, "go to bed."
+end }
+
+defs.lol = { name = "lol", usage = ";lol", run = function()
+	return true, "noted."
+end }
+
 ------------------------------------ dispatch ---------------------------------
 
 function CM.run(name, arg)
