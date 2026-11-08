@@ -62,17 +62,23 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-08.52"
+local BUILD = "2026-11-08.53"
 -- monotonic: the updater compares rev, never the date string
-local REV = 52
+local REV = 53
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
 local FRESH = getgenv and getgenv().AetherFresh == true
 
+-- Every stage URL carries the rev. raw.githubusercontent sits behind a CDN with a
+-- 300s TTL, and it caches per path: a push to a file kept the same URL served the
+-- previous bytes for up to five minutes, which is how a new pages/ file ended up
+-- running against a loader that had never heard of its module. Keying the URL on
+-- REV means a new build is a new key on every edge, so a bump propagates at once
+-- instead of whenever that edge feels like expiring.
 local function url(path)
-	if FRESH then return BASE .. path .. "?t=" .. tostring(os.time()) end
-	return BASE .. path
+	if FRESH then return BASE .. path .. "?v=" .. REV .. "&t=" .. tostring(os.time()) end
+	return BASE .. path .. "?v=" .. REV
 end
 
 local A = { base = BASE, build = BUILD, rev = REV }

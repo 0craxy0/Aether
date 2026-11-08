@@ -1,6 +1,6 @@
 {
-  "rev": 52,
-  "build": "2026-11-08.52",
-  "notes": "TextBox fires Focused, not FocusGained - the pair is not symmetric with FocusLost, and the new text row was listening for the one that does not exist, so it raised on build. The focus ring works now: the field brightens and its stroke takes the accent while it has focus, and both go back on FocusLost.",
+  "rev": 53,
+  "build": "2026-11-08.53",
+  "notes": "Every stage file is now fetched from a URL that carries the rev (?v=53), so a build can never be served half-old. raw.githubusercontent sits behind a CDN with a five-minute TTL keyed by path, which meant a push took up to five minutes to be visible and, worse, could hand a new loader an old copy of one file. Keying the URL on REV makes a bump a new cache key on every edge, so a new build lands immediately and can never mix with the previous one. The rev-52 focus fix rides along.",
   "loader": "main.lua"
 }
