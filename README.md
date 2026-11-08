@@ -96,6 +96,19 @@ Tuning notes that cannot be settled without the game open: steering sign (see th
 toggle), and the throttle floor at close range (0.45 - raise it if the car stalls
 on a slope). Both live in `modules/tesla.lua`'s drive step.
 
+## dev tools
+
+`tools/` holds scripts the hub never loads and `main.lua` never fetches - they are
+things you run yourself, once, while building a shelf for a game that has none.
+
+- `padlog.lua` - the probe for a game with no shelf yet. It samples the character
+  every frame and reports the three signals that actually identify a finish pad:
+  a teleport that was not walking (the position *before* it is the pad), a coin
+  counter that moved (the position you were standing on is the pad), and the
+  tier-shaped models in Workspace with their centres. F8 prints the summary, F9
+  writes `Aether/sendglobal-pads.json`. It reads your own position and your own
+  counters only; it never teleports, touches or fires anything.
+
 ## loading
 
 `main.lua` draws a small centred card before it fetches the first file, then
