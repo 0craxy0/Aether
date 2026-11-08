@@ -27,6 +27,9 @@ local CFG = {
 	perTarget = 2.5,     -- seconds before giving up on one target
 	fireEvery = 0.12,    -- seconds between Activate() calls
 	aimSettle = 0.05,    -- let the gun notice the new aim before firing
+	-- a Humanoid with no Dummy{number} ancestor is treated as scenery unless this
+	-- is on: a menu stand or a shop NPC is not worth a bullet
+	includeLoose = false,
 }
 
 local state = { running = false, stopAt = 0 }
@@ -43,24 +46,50 @@ end
 
 -- Every Humanoid that is not us and not another player. Dummies in this game are
 -- models with a Humanoid (KillsNpcs is an attribute, so something counts them).
+-- Dummies are named Dummy{number}, but the Humanoid does not have to sit directly
+-- under that model: the first scan reported "StandAvatar", which is the rig inside
+-- the dummy rather than the dummy itself. So the target is found by walking up from
+-- the Humanoid until an ancestor matches the naming pattern, and only then is it a
+-- dummy. Anything without such an ancestor (a menu stand, a shop NPC) is skipped
+-- unless CFG.includeLoose is turned on.
+local function dummyRoot(inst)
+	local node = inst
+	for _ = 1, 8 do
+		if not node or node == Workspace then break end
+		if node.Name:match("^Dummy%d*$") then return node, true end
+		node = node.Parent
+	end
+	return inst, false
+end
+
 local function candidates()
 	local me = LP.Character
-	local out = {}
+	local out, seenModel = {}, {}
 	local origin
-	local _, hum = char()
 	local root = me and me:FindFirstChild("HumanoidRootPart")
 	if root then origin = root.Position end
 
 	for _, d in ipairs(Workspace:GetDescendants()) do
-		if d:IsA("Humanoid") and d.Health > 0 then
-			local model = d.Parent
-			local isPlayer = model and Players:GetPlayerFromCharacter(model) ~= nil
-			if model and not isPlayer and model ~= me then
-				local hrp = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head")
-				if hrp then
-					local dist = origin and (hrp.Position - origin).Magnitude or 0
-					if dist <= CFG.maxRange then
-						out[#out + 1] = { model = model, hum = d, part = hrp, dist = dist }
+		if d:IsA("Humanoid") and d.Health > 0 and d.Parent then
+			local model, isDummy = dummyRoot(d.Parent)
+			local isPlayer = Players:GetPlayerFromCharacter(model) ~= nil
+			if model and not isPlayer and model ~= me and not seenModel[model] then
+				if isDummy or CFG.includeLoose then
+					-- the parts live in the rig, not necessarily in the Dummy model, so
+					-- look in the rig first and then anywhere under the dummy
+					local rig = d.Parent
+					local hrp = rig:FindFirstChild("HumanoidRootPart") or rig:FindFirstChild("Head")
+						or model:FindFirstChild("HumanoidRootPart", true)
+						or model:FindFirstChild("Head", true)
+					if hrp then
+						local dist = origin and (hrp.Position - origin).Magnitude or 0
+						if dist <= CFG.maxRange then
+							seenModel[model] = true
+							out[#out + 1] = {
+								model = model, hum = d, part = hrp, dist = dist,
+								matched = isDummy, rig = d.Parent.Name,
+							}
+						end
 					end
 				end
 			end
@@ -102,11 +131,25 @@ local function scan()
 	print(string.format("[KillAll] %d target(s) in %d studs:", #list, CFG.maxRange))
 	for i = 1, math.min(#list, 20) do
 		local t = list[i]
-		print(string.format("  %2d. %-24s hp %5.0f/%-5.0f  %3.0f studs",
-			i, t.model.Name:sub(1, 24), t.hum.Health, t.hum.MaxHealth, t.dist))
+		print(string.format("  %2d. %-16s rig %-14s hp %5.0f/%-5.0f %3.0f studs%s",
+			i, t.model.Name:sub(1, 16), t.rig:sub(1, 14),
+			t.hum.Health, t.hum.MaxHealth, t.dist, t.matched and "" or "  (not Dummy*)"))
 	end
 	if #list == 0 then
-		print("  (none - dummies may only spawn in a round, or they are not Humanoids)")
+		-- nothing matched: print every Humanoid in the place with its parent, so the
+		-- naming is visible instead of guessed at
+		print("  (none matched Dummy* - here is every Humanoid in Workspace:)")
+		local n = 0
+		for _, d in ipairs(Workspace:GetDescendants()) do
+			if d:IsA("Humanoid") then
+				n = n + 1
+				if n <= 15 then
+					print(string.format("     %-18s parent %-18s hp %.0f",
+						tostring(d.Parent and d.Parent.Name), tostring(d.Parent and d.Parent.Parent and d.Parent.Parent.Name), d.Health))
+				end
+			end
+		end
+		if n == 0 then print("     no Humanoids at all - dummies may spawn only during a round") end
 	end
 	return list
 end
