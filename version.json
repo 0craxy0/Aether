@@ -1,6 +1,6 @@
 {
-  "rev": 55,
-  "build": "2026-11-08.55",
-  "notes": "The owner panel is rebuilt as an instrument panel instead of a list of buttons. A status strip at the top carries a live dot, the running build in large type and the rev beside it; Composer and Release sit under small uppercase kickers; Session is a right-aligned key/value column with Copy diagnostics. The note kind is a segmented control rather than a cycler, the character budget is a bar that turns red when you pass it, and the fields use the same focus ring and padding as the shared widgets so the page reads as part of the program instead of a side project. Nothing it can do has changed: the same update check, restart, compose, publish and copy actions, on the same owner-only page.",
+  "rev": 56,
+  "build": "2026-11-08.56",
+  "notes": "Every stage file is now fetched from a commit-pinned path, not a branch path with a changing query string. The loader asks api.github.com which commit main is on once at startup, then loads <repo>/<sha>/core/..., which is a path no cache has ever seen. The rev query alone was not enough: a cache that keys by path treated tail/admin.lua?v=55 and ?v=54 as the same entry, so the header could say 55 while a page came back from the previous build. If the ref lookup fails the plain base is used, so an offline or rate-limited client still loads, just without the guarantee. Set getgenv().AetherDebug to see which base was chosen.",
   "loader": "main.lua"
 }

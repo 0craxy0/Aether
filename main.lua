@@ -62,9 +62,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-08.55"
+local BUILD = "2026-11-08.56"
 -- monotonic: the updater compares rev, never the date string
-local REV = 55
+local REV = 56
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -506,6 +506,33 @@ end
 
 -- One filtered list drives both the prefetch and the execution, so the two can
 -- never disagree about what this shelf loads - and the order is still FILES order.
+
+-- Pin every stage URL to a commit ------------------------------------------------
+-- ?v=<REV> is not enough on its own: the CDN in front of raw.githubusercontent
+-- caches by path and this client has served a query-ignoring cache, so
+-- tail/admin.lua? v=55 and v=54 were the same entry and the page came back from
+-- the previous build while the header said 55. A path nobody has requested cannot
+-- be stale, so ask the API (a different host, no such cache) which commit main is
+-- on and fetch every stage file from <repo>/<sha>/. One small request at startup;
+-- if it fails, the plain base is used and the rev query is still there.
+local PINNED = false
+if A.cmdRef then
+	local ok, body = pcall(game.HttpGet, game, A.cmdRef .. "?t=" .. tostring(os.time()))
+	if ok and type(body) == "string" and #body < 8192 then
+		local okDecode, data = pcall(function()
+			return game:GetService("HttpService"):JSONDecode(body)
+		end)
+		local sha = okDecode and type(data) == "table" and type(data.object) == "table" and data.object.sha or nil
+		if type(sha) == "string" and #sha >= 7 and sha:match("^%x+$") then
+			BASE = RAW_BASE .. sha .. "/"
+			PINNED = true
+		end
+	end
+end
+if getgenv and getgenv().AetherDebug then
+	print("[Aether] stage base " .. BASE .. (PINNED and " (commit-pinned)" or " (unpinned: ref lookup failed)"))
+end
+
 local loadPaths = {}
 for _, entry in ipairs(FILES) do
 	if loadsWith(entry[2]) then loadPaths[#loadPaths + 1] = entry[1] end
