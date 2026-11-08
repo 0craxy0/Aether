@@ -161,6 +161,63 @@ local function aimAt(part)
 	cam.CFrame = CFrame.lookAt(from, to)
 end
 
+-- Guns usually shoot where the *cursor* is, not where the camera looks, and a
+-- camera write cannot move the cursor. Executors expose mousemoverel for exactly
+-- this: push the virtual cursor by the screen offset between the crosshair and the
+-- target. Where it is unavailable the camera write above is the only option.
+local function aimMouse(part)
+	local cam = Workspace.CurrentCamera
+	if not cam or not part then return false end
+	local move
+	if type(mousemoverel) == "function" then
+		move = mousemoverel
+	elseif syn and type(syn.mousemoverel) == "function" then
+		move = syn.mousemoverel
+	elseif type(mousemoveabs) == "function" then
+		move = function(dx, dy)
+			local loc = UserInputService:GetMouseLocation()
+			mousemoveabs(loc.X + dx, loc.Y + dy)
+		end
+	end
+	if not move then return false end
+
+	local sp, on = cam:WorldToViewportPoint(part.Position)
+	if not on or sp.Z <= 0 then return false end
+	local vp = cam.ViewportSize
+	local dx, dy = sp.X - vp.X / 2, sp.Y - vp.Y / 2
+	if math.abs(dx) < 1 and math.abs(dy) < 1 then return true end
+	pcall(move, dx, dy)
+	return true
+end
+
+-- Deep, readable dump of remote arguments. Needed because "Fire(Vector3, {0})" in
+-- the log does not say which Vector3 or what the table holds, and a fabricated call
+-- has to match the real one exactly.
+local function deep(v, depth)
+	local t = typeof(v)
+	if t == "Vector3" then
+		return string.format("V3(%.2f, %.2f, %.2f)", v.X, v.Y, v.Z)
+	elseif t == "CFrame" then
+		local p = v.Position
+		return string.format("CFrame(%.1f, %.1f, %.1f)", p.X, p.Y, p.Z)
+	elseif t == "Instance" then
+		return v.Name
+	elseif t == "string" then
+		return string.format("%q", v:sub(1, 32))
+	elseif t == "table" then
+		if depth <= 0 then return "{...}" end
+		local bits = {}
+		for k, val in pairs(v) do
+			bits[#bits + 1] = tostring(k) .. "=" .. deep(val, depth - 1)
+			if #bits >= 8 then break end
+		end
+		return "{" .. table.concat(bits, ", ") .. "}"
+	elseif t == "number" then
+		return string.format("%.3f", v)
+	end
+	return tostring(v)
+end
+
 -- What "dead" means here. There is no Health: the model carries Consciousness
 -- (100 → 0), BloodMl (5000 and falling), Condition/Status strings, and a Summary
 -- written by the game's own medical simulation. Any of those leaving the healthy
@@ -258,7 +315,8 @@ local function killOne(target, tool)
 		local t = c:FindFirstChildOfClass("Tool") or tool
 		if not t then break end
 
-		aimAt(target.part)
+		local aimed = aimMouse(target.part)
+		if not aimed then aimAt(target.part) end
 		task.wait(CFG.aimSettle)
 		pcall(function() t:Activate() end)
 		task.wait(CFG.fireEvery)
@@ -320,10 +378,53 @@ local function run()
 	end
 end
 
+-- Records the exact arguments the game sends when you shoot by hand. A fabricated
+-- Fire() has to match the real call, and the summary in the hook log ("Vector3,
+-- {0}") does not say which vector or what is in the table.
+local capturing = false
+
+local function capture(limit)
+	if capturing then return print("[KillAll] already capturing") end
+	limit = tonumber(limit) or 4
+	capturing = true
+	local count = 0
+
+	local okHook = pcall(function()
+		local old
+		old = hookmetamethod(game, "__namecall", function(self, ...)
+			local method = getnamecallmethod()
+			if capturing and count < limit and (method == "FireServer" or method == "InvokeServer") then
+				local name = typeof(self) == "Instance" and self.Name or "?"
+				if name == "Fire" or name:find("Fire", 1, true) or name == "PointedAt" then
+					local n = select("#", ...)
+					local args = { ... }
+					local bits = {}
+					for i = 1, n do bits[#bits + 1] = deep(args[i], 2) end
+					local holder = self.Parent and self.Parent.Name or "?"
+					print(string.format("[KillAll] %s.%s(%s)", tostring(holder), name, table.concat(bits, ", ")))
+					count = count + 1
+					if count >= limit then
+						capturing = false
+						print("[KillAll] capture complete")
+					end
+				end
+			end
+			return old(self, ...)
+		end)
+	end)
+
+	if not okHook then
+		capturing = false
+		return print("[KillAll] this executor will not let a script hook __namecall")
+	end
+	print("[KillAll] capture armed - fire the gun once by hand")
+end
+
 local module = {
 	scan = scan,
 	dump = dumpFolder,
 	run = run,
+	capture = capture,
 	stop = function() state.running = false end,
 }
 getgenv().KillAll = module
