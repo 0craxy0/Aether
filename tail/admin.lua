@@ -5,22 +5,188 @@ local A = ...
 -- is read, stored or sent, no other client is contacted, and the page is only
 -- ever built on this account. Everything it exposes is a control over this
 -- instance of the script - re-check the CDN, restart into the latest build,
--- compose and preview a note - which is the same set of actions a user already
+-- compose and publish a note - which is the same set of actions a user already
 -- has on the Settings page.
 local ADMIN_ID = 1562524075
 if not A.LP or A.LP.UserId ~= ADMIN_ID then return end
 
 local T, FONT = A.T, A.FONT
-local new, button, makePage = A.new, A.button, A.makePage
+local new, label, tween, makePage = A.new, A.label, A.tween, A.makePage
 
 local pAdmin = makePage("Admin", 9)
 
--- maintenance ---------------------------------------------------
-local sMaint = pAdmin.section("Maintenance", 1)
-button(sMaint, "Force update check", "CHECK", function()
+--------------------------------------------------------------------- furniture --
+-- The page is meant to read like an instrument panel rather than a settings
+-- list: a status strip at the top, then one group per job, with the small type
+-- quiet and the numbers where the eye already is.
+
+local function kicker(parent, text)
+	return label({
+		Text = text, Font = FONT.bold, TextSize = 9, TextColor3 = T.muted,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Size = UDim2.new(1, 0, 0, 12), Parent = parent,
+	})
+end
+
+-- one key/value line: the key quiet on the left, the value on the right where
+-- a column of numbers can be scanned
+local function statRow(parent, key, value)
+	local row = A.rowBaseRaw(parent, 28)
+	label({
+		Text = key, TextColor3 = T.muted, TextSize = 11,
+		TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd,
+		Position = UDim2.fromOffset(11, 0), Size = UDim2.new(0.5, -11, 1, 0), Parent = row,
+	})
+	local v = label({
+		Text = value, Font = FONT.med, TextSize = 11, TextColor3 = T.text,
+		TextXAlignment = Enum.TextXAlignment.Right, TextTruncate = Enum.TextTruncate.AtEnd,
+		Position = UDim2.new(0.5, 0, 0, 0), Size = UDim2.new(0.5, -11, 1, 0), Parent = row,
+	})
+	return v
+end
+
+-- a real text field, with the focus ring the shared input widget uses, so the
+-- admin page does not feel like a different program
+local function field(parent, placeholder, height, multiline)
+	local box = new("TextBox", {
+		Text = "", PlaceholderText = placeholder, MultiLine = multiline or false,
+		ClearTextOnFocus = false, TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = multiline and Enum.TextYAlignment.Top or Enum.TextYAlignment.Center,
+		Font = FONT.reg, TextSize = 11, TextColor3 = T.text, PlaceholderColor3 = T.muted,
+		BackgroundColor3 = T.raised, BackgroundTransparency = 0.35, BorderSizePixel = 0,
+		Size = UDim2.new(1, 0, 0, height or 30), Parent = parent,
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }) })
+	local stroke = new("UIStroke", {
+		Color = T.stroke, Transparency = 0.4, Thickness = 1,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = box,
+	})
+	if multiline then
+		new("UIPadding", {
+			PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8),
+			PaddingTop = UDim.new(0, 6), PaddingBottom = UDim.new(0, 6), Parent = box,
+		})
+	else
+		new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 8), Parent = box })
+	end
+	box.Focused:Connect(function()
+		tween(box, 0.12, { BackgroundTransparency = 0 })
+		stroke.Color, stroke.Transparency = T.accent, 0
+	end)
+	box.FocusLost:Connect(function()
+		tween(box, 0.15, { BackgroundTransparency = 0.35 })
+		stroke.Color, stroke.Transparency = T.stroke, 0.4
+	end)
+	return box
+end
+
+-- segmented control: one row, N choices, the chosen one lit. A cycler was the
+-- only option before because a dropdown registers a config row under a name
+-- that could collide with a real setting; a segmented control has neither.
+local function segmented(parent, key, options, initial, onPick)
+	local row = A.rowBaseRaw(parent, 38)
+	label({
+		Text = key, TextColor3 = T.muted, TextSize = 11,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Position = UDim2.fromOffset(11, 0), Size = UDim2.new(0.45, -11, 1, 0), Parent = row,
+	})
+	local rail = new("Frame", {
+		AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -9, 0.5, 0),
+		Size = UDim2.fromOffset(148, 24), BackgroundColor3 = T.panel, BackgroundTransparency = 0.2,
+		BorderSizePixel = 0, Parent = row,
+	}, { new("UICorner", { CornerRadius = UDim.new(0, 6) }), new("UIListLayout", {
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder,
+	}) })
+
+	local state = initial
+	local buttons = {}
+	local paint
+
+	for i, opt in ipairs(options) do
+		local b = new("TextButton", {
+			Text = opt.label, Font = FONT.bold, TextSize = 9, AutoButtonColor = false,
+			TextColor3 = T.muted, BackgroundColor3 = T.accent, BackgroundTransparency = 1,
+			BorderSizePixel = 0, LayoutOrder = i,
+			Size = UDim2.fromOffset(math.floor(142 / #options), 20), Parent = rail,
+		}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
+		buttons[i] = { btn = b, value = opt.value }
+		b.MouseEnter:Connect(function()
+			if state ~= opt.value then tween(b, 0.12, { TextColor3 = T.text }) end
+		end)
+		b.MouseLeave:Connect(function()
+			if state ~= opt.value then tween(b, 0.12, { TextColor3 = T.muted }) end
+		end)
+		b.MouseButton1Click:Connect(function()
+			if state == opt.value then return end
+			state = opt.value
+			paint()
+			if onPick then pcall(onPick, state) end
+		end)
+	end
+
+	paint = function()
+		for _, entry in ipairs(buttons) do
+			local on = entry.value == state
+			tween(entry.btn, 0.15, {
+				BackgroundTransparency = on and 0.82 or 1,
+				TextColor3 = on and T.text or T.muted,
+			})
+			entry.btn.BackgroundColor3 = T.accent
+		end
+	end
+	paint()
+
+	return { get = function() return state end, set = function(v) state = v; paint() end }
+end
+
+------------------------------------------------------------------------ status --
+-- The strip answers "what am I running" before anything else on the page, and
+-- carries the two actions that answer "and is that current".
+
+local sTop = pAdmin.section("Status", 1)
+
+local strip = A.rowBaseRaw(sTop, 52)
+local dot = new("Frame", {
+	AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.fromOffset(16, 26),
+	Size = UDim2.fromOffset(8, 8), BackgroundColor3 = T.good, BorderSizePixel = 0, Parent = strip,
+}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+new("UIStroke", { Color = T.good, Transparency = 0.6, Thickness = 1, Parent = dot })
+
+label({
+	Text = "BUILD", Font = FONT.bold, TextSize = 9, TextColor3 = T.muted,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Position = UDim2.fromOffset(32, 10), Size = UDim2.new(1, -40, 0, 12), Parent = strip,
+})
+local buildLbl = label({
+	Text = tostring(A.build or "?"), Font = FONT.bold, TextSize = 15, TextColor3 = T.text,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	Position = UDim2.fromOffset(32, 22), Size = UDim2.new(0.6, -40, 0, 20), Parent = strip,
+})
+local revLbl = label({
+	Text = "rev " .. tostring(A.rev or "?"), TextSize = 11, TextColor3 = T.muted,
+	TextXAlignment = Enum.TextXAlignment.Right,
+	AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -12, 0, 26),
+	Size = UDim2.new(0.4, -16, 0, 16), Parent = strip,
+})
+
+-- the dot breathes while the panel is open: it is the one element that says
+-- "this is live" rather than a screenshot of a build number
+task.spawn(function()
+	while strip.Parent do
+		tween(dot, 1.4, { BackgroundTransparency = 0.55 }, Enum.EasingStyle.Sine)
+		task.wait(1.4)
+		tween(dot, 1.4, { BackgroundTransparency = 0 }, Enum.EasingStyle.Sine)
+		task.wait(1.4)
+	end
+end)
+
+button(sTop, "Force update check", "CHECK", function()
 	if A.updater then A.updater.checkNow() end
 end)
-button(sMaint, "Restart into latest", "RESTART", function()
+button(sTop, "Restart into latest", "RESTART", function()
 	if not A.updater then return end
 	local ok, saved, msg = pcall(A.flushConfig)
 	if not (ok and saved == true) then
@@ -30,31 +196,44 @@ button(sMaint, "Restart into latest", "RESTART", function()
 	A.updater.restart()
 end)
 
--- publisher -----------------------------------------------------
--- The note composer. A client cannot write to GitHub, so this does the part that
--- is actually painful by hand: it builds the exact file, previews it in the real
--- toast, and puts it on the clipboard. Committing announcements.json publishes it.
-local sAnn = pAdmin.section("Announcements", 2)
+--------------------------------------------------------------------- composer --
+-- One note, four ways out: preview it as the toast a reader sees, publish it to
+-- the endpoint, or copy it as the file/JSON the old commit-only path needed.
 
-local KIND_ORDER = { "Info", "Good", "Bad" }
-local KIND_COLOR = { Info = T.accent, Good = T.good, Bad = T.bad }
+local sAnn = pAdmin.section("Composer", 2)
+
 local draft = type(A.extra.announceDraft) == "table" and A.extra.announceDraft or {}
-local noteKind = tostring(draft.kind or "Info")
 local cap = (A.announce and A.announce.maxChars) or 220
+local kind = tostring(draft.kind or "Info"):lower()
 
-local box = new("TextBox", {
-	Text = tostring(draft.text or ""), PlaceholderText = "Write the note people will see…",
-	MultiLine = true, ClearTextOnFocus = false, TextWrapped = true,
-	TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-	Font = FONT.reg, TextSize = 11, TextColor3 = T.text, PlaceholderColor3 = T.muted,
-	BackgroundColor3 = T.raised, BackgroundTransparency = 0.35, BorderSizePixel = 0,
-	Size = UDim2.new(1, 0, 0, 64), Parent = sAnn,
-}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }), new("UIStroke", { Color = T.stroke, Transparency = 0.4, Thickness = 1 }) })
+local kindPick = segmented(sAnn, "Note kind", {
+	{ label = "INFO", value = "info" },
+	{ label = "GOOD", value = "good" },
+	{ label = "BAD", value = "bad" },
+}, kind, function(v)
+	kind = v
+	draft.kind = v
+	if A.touch then A.touch() end
+end)
 
-local count = A.label({
+kicker(sAnn, "MESSAGE")
+
+local box = field(sAnn, "Write the note people will see…", 68, true)
+box.Text = tostring(draft.text or "")
+
+-- budget: a bar first, the number second - at a glance the bar is the answer
+local track = new("Frame", {
+	Size = UDim2.new(1, 0, 0, 3), BackgroundColor3 = T.stroke, BackgroundTransparency = 0.4,
+	BorderSizePixel = 0, Parent = sAnn,
+}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+local fill = new("Frame", {
+	Size = UDim2.new(0, 0, 1, 0), BackgroundColor3 = T.accent, BorderSizePixel = 0, Parent = track,
+}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+
+local count = label({
 	Text = "", TextColor3 = T.muted, TextSize = 10,
 	TextXAlignment = Enum.TextXAlignment.Right,
-	Size = UDim2.new(1, 0, 0, 14), Parent = sAnn,
+	Size = UDim2.new(1, 0, 0, 12), Parent = sAnn,
 })
 
 local function trimmed()
@@ -67,75 +246,43 @@ end
 local function refreshCount()
 	local n = #(tostring(box.Text or ""):gsub("%s+", " "))
 	count.Text = n .. " / " .. cap
-	count.TextColor3 = n > cap and T.bad or T.muted
+	local over = n > cap
+	count.TextColor3 = over and T.bad or T.muted
+	fill.BackgroundColor3 = over and T.bad or T.accent
+	tween(fill, 0.15, { Size = UDim2.fromScale(math.clamp(n / cap, 0, 1), 1) })
 end
 refreshCount()
 
 local function saveDraft()
-	A.extra.announceDraft = { text = box.Text or "", kind = noteKind }
-	if A.touch then A.touch() end -- debounced with everything else
+	A.extra.announceDraft = { text = box.Text or "", kind = kind }
+	if A.touch then A.touch() end
 end
 
 box:GetPropertyChangedSignal("Text"):Connect(refreshCount)
 box.FocusLost:Connect(saveDraft)
 
--- kind: a cycler rather than a dropdown, so it cannot register a row in the
--- shared config under a name that could collide with a real setting
-local kindRow = A.rowBase(sAnn)
-A.label({
-	Text = "Note kind", Font = FONT.med, TextSize = 12,
-	Position = UDim2.fromOffset(11, 0), Size = UDim2.new(1, -110, 1, 0), Parent = kindRow,
-})
-local kindBtn = new("TextButton", {
-	Text = "", Font = FONT.bold, TextSize = 11, AutoButtonColor = false, BorderSizePixel = 0,
-	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -9, 0.5, 0),
-	Size = UDim2.fromOffset(80, 22), Parent = kindRow,
-}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
-
-local function paintKind()
-	kindBtn.Text = noteKind:upper()
-	kindBtn.TextColor3 = KIND_COLOR[noteKind] or T.text
-	kindBtn.BackgroundColor3 = T.stroke
-end
-paintKind()
-
-kindBtn.MouseButton1Click:Connect(function()
-	for i, k in ipairs(KIND_ORDER) do
-		if k == noteKind then
-			noteKind = KIND_ORDER[i % #KIND_ORDER + 1]
-			break
-		end
-	end
-	paintKind()
-	saveDraft()
-end)
-
 local function buildItem()
 	local item = { id = os.date("!%Y%m%d-%H%M%S"), text = trimmed() }
-	if noteKind == "Good" then item.kind = "good" elseif noteKind == "Bad" then item.kind = "bad" end
+	if kind == "good" then item.kind = "good" elseif kind == "bad" then item.kind = "bad" end
 	return item
 end
 
 button(sAnn, "Preview note", "SHOW", function()
 	local text = trimmed()
 	if text == "" then return A.notify("Announcements", "nothing written yet", "bad") end
-	local kind = noteKind == "Good" and "good" or noteKind == "Bad" and "bad" or nil
-	A.notify("Aether", text, kind) -- exactly what a reader will see
+	local k = (kind == "good" or kind == "bad") and kind or nil
+	A.notify("Aether", text, k) -- exactly what a reader will see
 end)
 
--- Sending. The publish token is typed into this box and lives nowhere else: it
--- is never written to config.json, never baked into the script, and a box
--- holding nothing means the button reports "paste the token first". That is the
--- whole reason this is safe to ship - the ability to publish is the token, and
--- the token only exists while the owner is looking at this page.
-local tokenBox = new("TextBox", {
-	Text = "", PlaceholderText = "Paste publish token (kept in memory only)",
-	ClearTextOnFocus = false, TextWrapped = true,
-	TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center,
-	Font = FONT.reg, TextSize = 11, TextColor3 = T.text, PlaceholderColor3 = T.muted,
-	BackgroundColor3 = T.raised, BackgroundTransparency = 0.35, BorderSizePixel = 0,
-	Size = UDim2.new(1, 0, 0, 30), Parent = sAnn,
-}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }), new("UIStroke", { Color = T.stroke, Transparency = 0.4, Thickness = 1 }) })
+----------------------------------------------------------------------- publish --
+-- The token is typed here and lives nowhere else: never written to config.json,
+-- never baked into the script, and an empty box means the button reports "paste
+-- the token first". The ability to publish IS the token, and it only exists
+-- while the owner is looking at this page.
+
+kicker(sAnn, "PUBLISH")
+
+local tokenBox = field(sAnn, "Paste publish token (kept in memory only)", 30, false)
 
 local sending = false
 
@@ -194,80 +341,6 @@ button(sAnn, "Send to everyone", "SEND", function()
 	end)
 end)
 
--- Release notes -------------------------------------------------
--- The wording of the update prompt, written here instead of in version.json.
--- The rev is still version.json's: a rev is a promise that fetching main.lua
--- returns that build, and only a commit can make that true. So the panel can
--- author every word the dialog shows, and nothing else.
-local relTitle = new("TextBox", {
-	Text = "", PlaceholderText = "Update title (blank = \"Aether release\")",
-	ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left,
-	Font = FONT.reg, TextSize = 11, TextColor3 = T.text, PlaceholderColor3 = T.muted,
-	BackgroundColor3 = T.raised, BackgroundTransparency = 0.35, BorderSizePixel = 0,
-	Size = UDim2.new(1, 0, 0, 30), Parent = sAnn,
-}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }), new("UIStroke", { Color = T.stroke, Transparency = 0.4, Thickness = 1 }) })
-
-local relScope = "standalone"
-local scopeRow = A.rowBase(sAnn)
-A.label({
-	Text = "Release shows to", Font = FONT.med, TextSize = 12,
-	Position = UDim2.fromOffset(11, 0), Size = UDim2.new(1, -110, 1, 0), Parent = scopeRow,
-})
-local scopeBtn = new("TextButton", {
-	Text = "", Font = FONT.bold, TextSize = 11, AutoButtonColor = false, BorderSizePixel = 0,
-	AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -9, 0.5, 0),
-	Size = UDim2.fromOffset(96, 22), Parent = scopeRow,
-}, { new("UICorner", { CornerRadius = UDim.new(0, 5) }) })
-
-local function paintScope()
-	scopeBtn.Text = relScope == "build" and "THIS BUILD" or "EVERYONE"
-	scopeBtn.TextColor3 = relScope == "build" and T.accent or T.text
-	scopeBtn.BackgroundColor3 = T.stroke
-end
-paintScope()
-
-scopeBtn.MouseButton1Click:Connect(function()
-	relScope = relScope == "build" and "standalone" or "build"
-	paintScope()
-end)
-
-local publishingRelease = false
-
-button(sAnn, "Publish release notes", "REL", function()
-	if publishingRelease then return end
-	-- the toast composer caps at 220; a release note has room for more
-	local text = (tostring(box.Text or ""):gsub("%s+", " "))
-	text = text:match("^%s*(.-)%s*$") or ""
-	if text == "" then return A.notify("Release", "the note box is empty", "bad") end
-	if #text > 400 then text = text:sub(1, 400) end
-
-	local payload = { title = tostring(relTitle.Text or ""), notes = text }
-	if relScope == "build" then
-		payload.rev = A.rev
-		payload.build = A.build
-	end
-
-	publishingRelease = true
-	task.spawn(function()
-		local ok, err = post("/release", payload)
-		publishingRelease = false
-		if ok then
-			A.notify("Release", relScope == "build"
-				and ("saved - decorates the rev " .. tostring(A.rev) .. " prompt")
-				or "saved - every client sees it once", "good")
-		else
-			A.notify("Release", "not saved: " .. tostring(err), "bad")
-		end
-	end)
-end)
-
-button(sAnn, "Clear release notes", "CLEAR", function()
-	task.spawn(function()
-		local ok, err = post("/release", { clear = true })
-		A.notify("Release", ok and "cleared" or ("not cleared: " .. tostring(err)), ok and "good" or "bad")
-	end)
-end)
-
 button(sAnn, "Copy announcements.json", "COPY", function()
 	local text = trimmed()
 	if text == "" then return A.notify("Announcements", "nothing written yet", "bad") end
@@ -297,26 +370,98 @@ button(sAnn, "Reset seen announcements", "RESET", function()
 	A.notify("Announcements", "seen list cleared", "good")
 end)
 
-A.label({
-	Text = "Send posts straight to the announcements endpoint - no commit, no repo edit, visible to every reader within 15s. The token box is memory only: nothing is saved to disk, and closing the script forgets it. Copy is the old fallback if the endpoint is down.",
+label({
+	Text = "Send posts straight to the announcements endpoint - no commit, no repo edit, visible to every reader within 15s. The token box is memory only: closing the script forgets it. Copy is the fallback if the endpoint is down.",
 	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
 	Size = UDim2.new(1, 0, 0, 42), Parent = sAnn,
 })
 
--- session -------------------------------------------------------
-local sInfo = pAdmin.section("Session", 3)
-for _, row in ipairs({
-	{ "UserId", tostring(A.LP.UserId) },
-	{ "Executor", tostring(A.executorName) },
-	{ "Build", tostring(A.build) },
-	{ "Rev", tostring(A.rev) },
-}) do
-	A.label({
-		Text = string.format('<font color="#79818C">%s</font>   %s', row[1], row[2]),
-		TextSize = 11, Size = UDim2.new(1, 0, 0, 18), Parent = sInfo,
-	})
-end
-A.label({
+----------------------------------------------------------------------- release --
+-- The wording of the update prompt, written here instead of in version.json.
+-- The rev is still version.json's: a rev is a promise that fetching main.lua
+-- returns that build, and only a commit can make that true. So the panel can
+-- author every word the dialog shows, and nothing else.
+
+local sRel = pAdmin.section("Release", 3)
+
+kicker(sRel, "TITLE")
+local relTitle = field(sRel, 'Update title (blank = "Aether release")', 30, false)
+
+local relScope = "standalone"
+segmented(sRel, "Shows to", {
+	{ label = "EVERYONE", value = "standalone" },
+	{ label = "THIS BUILD", value = "build" },
+}, relScope, function(v) relScope = v end)
+
+label({
+	Text = "This build decorates the update prompt for the rev you are running; everyone shows it once, to all clients.",
+	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
+	Size = UDim2.new(1, 0, 0, 26), Parent = sRel,
+})
+
+local publishingRelease = false
+
+button(sRel, "Publish release notes", "REL", function()
+	if publishingRelease then return end
+	-- the toast composer caps at 220; a release note has room for more
+	local text = (tostring(box.Text or ""):gsub("%s+", " "))
+	text = text:match("^%s*(.-)%s*$") or ""
+	if text == "" then return A.notify("Release", "the note box is empty", "bad") end
+	if #text > 400 then text = text:sub(1, 400) end
+
+	local payload = { title = tostring(relTitle.Text or ""), notes = text }
+	if relScope == "build" then
+		payload.rev = A.rev
+		payload.build = A.build
+	end
+
+	publishingRelease = true
+	task.spawn(function()
+		local ok, err = post("/release", payload)
+		publishingRelease = false
+		if ok then
+			A.notify("Release", relScope == "build"
+				and ("saved - decorates the rev " .. tostring(A.rev) .. " prompt")
+				or "saved - every client sees it once", "good")
+		else
+			A.notify("Release", "not saved: " .. tostring(err), "bad")
+		end
+	end)
+end)
+
+button(sRel, "Clear release notes", "CLEAR", function()
+	task.spawn(function()
+		local ok, err = post("/release", { clear = true })
+		A.notify("Release", ok and "cleared" or ("not cleared: " .. tostring(err)), ok and "good" or "bad")
+	end)
+end)
+
+----------------------------------------------------------------------- session --
+-- What this instance is, in one column, plus a copy of the same thing for a bug
+-- report. Every value here is read from A, which this build already publishes.
+
+local sInfo = pAdmin.section("Session", 4)
+
+statRow(sInfo, "Account", tostring(A.LP.UserId))
+statRow(sInfo, "Executor", tostring(A.executorName or "?"))
+statRow(sInfo, "Build", tostring(A.build or "?"))
+statRow(sInfo, "Rev", tostring(A.rev or "?"))
+statRow(sInfo, "Place", tostring(game.PlaceId))
+statRow(sInfo, "Shelf", tostring(A.profile or "?"))
+
+button(sInfo, "Copy diagnostics", "COPY", function()
+	local text = table.concat({
+		"Aether " .. tostring(A.build) .. " (rev " .. tostring(A.rev) .. ")",
+		"executor " .. tostring(A.executorName or "?"),
+		"shelf " .. tostring(A.profile or "?"),
+		"place " .. tostring(game.PlaceId),
+		"job " .. tostring(game.JobId),
+	}, "\n")
+	A.copy(text)
+	A.notify("Session", "copied", "good")
+end)
+
+label({
 	Text = "Owner panel. It reads nothing about other clients and sends nothing about this one.",
 	TextColor3 = T.muted, TextSize = 10, TextWrapped = true,
 	Size = UDim2.new(1, 0, 0, 28), Parent = sInfo,

@@ -1,6 +1,6 @@
 {
-  "rev": 54,
-  "build": "2026-11-08.54",
-  "notes": "Launching by a cached path is over. raw.githubusercontent caches by path for 300s and this client was still being served a rev behind even with a changing query string, so the two places Aether re-launches itself - auto-execute on teleport, and the update restart - now resolve the current commit through api.github.com first and then fetch <commit>/main.lua. That path has never been cached, so a re-launch cannot land on the previous build. Both fall back to the old URL if the ref cannot be read.",
+  "rev": 55,
+  "build": "2026-11-08.55",
+  "notes": "The owner panel is rebuilt as an instrument panel instead of a list of buttons. A status strip at the top carries a live dot, the running build in large type and the rev beside it; Composer and Release sit under small uppercase kickers; Session is a right-aligned key/value column with Copy diagnostics. The note kind is a segmented control rather than a cycler, the character budget is a bar that turns red when you pass it, and the fields use the same focus ring and padding as the shared widgets so the page reads as part of the program instead of a side project. Nothing it can do has changed: the same update check, restart, compose, publish and copy actions, on the same owner-only page.",
   "loader": "main.lua"
 }

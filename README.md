@@ -406,6 +406,14 @@ see the executor / build / rev it is running. Every one of those is a control ov
 *this* instance of the script - the same actions the Settings page already offers -
 just collected in one place.
 
+It is laid out as an instrument panel rather than a settings list: a **status
+strip** with a live dot, the running build in large type and the rev beside it,
+then **Composer**, **Release** and **Session** below. The composer's note kind is a
+segmented control, its character budget is a bar that turns red when you pass it,
+and the field styling (focus ring, padding, stroke) is the same code path the
+shared widgets use, so the page reads as part of the program. Session is a
+right-aligned key/value column with a **Copy diagnostics** button for bug reports.
+
 ## updating
 
 `tail/updater.lua` reads `version.json` every 15s (Settings > Updates) and compares
