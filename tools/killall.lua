@@ -44,14 +44,18 @@ local function cash()
 	return type(v) == "number" and v or nil
 end
 
--- Every Humanoid that is not us and not another player. Dummies in this game are
--- models with a Humanoid (KillsNpcs is an attribute, so something counts them).
--- Dummies are named Dummy{number}, but the Humanoid does not have to sit directly
--- under that model: the first scan reported "StandAvatar", which is the rig inside
--- the dummy rather than the dummy itself. So the target is found by walking up from
--- the Humanoid until an ancestor matches the naming pattern, and only then is it a
--- dummy. Anything without such an ancestor (a menu stand, a shop NPC) is skipped
--- unless CFG.includeLoose is turned on.
+-- Where dummies actually live: a Dummies folder under Workspace, holding one model
+-- per dummy. The Humanoid is not directly under that model - it sits in a nested rig
+-- ("StandAvatar"), which is why matching on the immediate parent found the rig and
+-- not the dummy. Folder membership is the reliable signal; the Dummy{number} name
+-- pattern is kept as a second net for rounds that spawn outside it.
+local function dummyFolder()
+	for _, c in ipairs(Workspace:GetChildren()) do
+		if c.Name:lower() == "dummies" then return c end
+	end
+	return nil
+end
+
 local function dummyRoot(inst)
 	local node = inst
 	for _ = 1, 8 do
@@ -62,6 +66,23 @@ local function dummyRoot(inst)
 	return inst, false
 end
 
+local function humOf(model)
+	local direct = model:FindFirstChildOfClass("Humanoid")
+	if direct then return direct end
+	local ok, found = pcall(function() return model:FindFirstChildWhichIsA("Humanoid", true) end)
+	return ok and found or nil
+end
+
+local function partOf(model)
+	local ok, found = pcall(function()
+		return model:FindFirstChild("HumanoidRootPart")
+			or model:FindFirstChild("Head")
+			or model:FindFirstChild("HumanoidRootPart", true)
+			or model:FindFirstChild("Head", true)
+	end)
+	return ok and found or nil
+end
+
 local function candidates()
 	local me = LP.Character
 	local out, seenModel = {}, {}
@@ -69,33 +90,43 @@ local function candidates()
 	local root = me and me:FindFirstChild("HumanoidRootPart")
 	if root then origin = root.Position end
 
+	local function add(model, byFolder)
+		if not model or model == me or seenModel[model] then return end
+		if Players:GetPlayerFromCharacter(model) then return end
+		local hum = humOf(model)
+		if not hum or hum.Health <= 0 then return end
+		local part = partOf(model)
+		if not part then return end
+		local dist = origin and (part.Position - origin).Magnitude or 0
+		if dist > CFG.maxRange then return end
+		seenModel[model] = true
+		out[#out + 1] = {
+			model = model, hum = hum, part = part, dist = dist,
+			folder = byFolder, rig = hum.Parent and hum.Parent.Name or "?",
+		}
+	end
+
+	-- 1. everything in Workspace.Dummies
+	local folder = dummyFolder()
+	local folderCount = 0
+	if folder then
+		for _, child in ipairs(folder:GetChildren()) do
+			folderCount = folderCount + 1
+			add(child, true)
+		end
+	end
+
+	-- 2. Dummy{number} anywhere else, and loose Humanoids if asked for
 	for _, d in ipairs(Workspace:GetDescendants()) do
 		if d:IsA("Humanoid") and d.Health > 0 and d.Parent then
 			local model, isDummy = dummyRoot(d.Parent)
-			local isPlayer = Players:GetPlayerFromCharacter(model) ~= nil
-			if model and not isPlayer and model ~= me and not seenModel[model] then
-				if isDummy or CFG.includeLoose then
-					-- the parts live in the rig, not necessarily in the Dummy model, so
-					-- look in the rig first and then anywhere under the dummy
-					local rig = d.Parent
-					local hrp = rig:FindFirstChild("HumanoidRootPart") or rig:FindFirstChild("Head")
-						or model:FindFirstChild("HumanoidRootPart", true)
-						or model:FindFirstChild("Head", true)
-					if hrp then
-						local dist = origin and (hrp.Position - origin).Magnitude or 0
-						if dist <= CFG.maxRange then
-							seenModel[model] = true
-							out[#out + 1] = {
-								model = model, hum = d, part = hrp, dist = dist,
-								matched = isDummy, rig = d.Parent.Name,
-							}
-						end
-					end
-				end
-			end
+			if isDummy or CFG.includeLoose then add(model, false) end
 		end
 	end
+
 	table.sort(out, function(a, b) return a.dist < b.dist end)
+	out.folderCount = folderCount
+	out.folderFound = folder ~= nil
 	return out
 end
 
@@ -128,24 +159,29 @@ end
 
 local function scan()
 	local list = candidates()
-	print(string.format("[KillAll] %d target(s) in %d studs:", #list, CFG.maxRange))
+	local where = list.folderFound
+		and string.format("Workspace.Dummies (%d child model(s))", list.folderCount)
+		or "no Workspace.Dummies folder"
+	print(string.format("[KillAll] %d target(s) within %d studs · %s", #list, CFG.maxRange, where))
 	for i = 1, math.min(#list, 20) do
 		local t = list[i]
-		print(string.format("  %2d. %-16s rig %-14s hp %5.0f/%-5.0f %3.0f studs%s",
+		print(string.format("  %2d. %-16s rig %-14s hp %5.0f/%-5.0f %3.0f studs  %s",
 			i, t.model.Name:sub(1, 16), t.rig:sub(1, 14),
-			t.hum.Health, t.hum.MaxHealth, t.dist, t.matched and "" or "  (not Dummy*)"))
+			t.hum.Health, t.hum.MaxHealth, t.dist, t.folder and "folder" or "Dummy*"))
 	end
 	if #list == 0 then
-		-- nothing matched: print every Humanoid in the place with its parent, so the
-		-- naming is visible instead of guessed at
-		print("  (none matched Dummy* - here is every Humanoid in Workspace:)")
+		-- nothing matched: print every Humanoid in the place with its parent chain,
+		-- so the hierarchy is visible instead of guessed at
+		print("  (nothing matched - every Humanoid in Workspace follows:)")
 		local n = 0
 		for _, d in ipairs(Workspace:GetDescendants()) do
 			if d:IsA("Humanoid") then
 				n = n + 1
 				if n <= 15 then
-					print(string.format("     %-18s parent %-18s hp %.0f",
-						tostring(d.Parent and d.Parent.Name), tostring(d.Parent and d.Parent.Parent and d.Parent.Parent.Name), d.Health))
+					local p1 = d.Parent and d.Parent.Name or "?"
+					local p2 = d.Parent and d.Parent.Parent and d.Parent.Parent.Name or "?"
+					local p3 = d.Parent and d.Parent.Parent and d.Parent.Parent.Parent and d.Parent.Parent.Parent.Name or "?"
+					print(string.format("     %-14s <- %-14s <- %-14s hp %.0f", p1, p2, p3, d.Health))
 				end
 			end
 		end
