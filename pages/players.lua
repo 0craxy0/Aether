@@ -14,7 +14,18 @@ local plrList = new("Frame", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enu
 local refreshPlayers
 do
 	local PV = { plr = nil, open = false, query = "", marks = {}, spectating = nil, flinging = false, flingConn = nil, btns = {} }
-	local PW = 214
+	-- The card used to be a fixed 214x318, which was only ever right at the
+	-- default window size: with "Scale UI contents" off the window grows in real
+	-- pixels while the contents do not, so the card sat there at its old size
+	-- against a much bigger panel. Deriving it from the logical window size makes
+	-- both modes agree - scaled, A.W/H stay put and the UIScale does the growing;
+	-- unscaled, they grow and the card grows with them.
+	local function panelSize()
+		local w = math.clamp(math.floor((A.W or 580) * 0.37), 190, 400)
+		local h = math.clamp(math.floor((A.H or 430) * 0.74), 240, 470)
+		return w, h
+	end
+	local PW, PH = panelSize()
 
 	local psFrame = new("Frame", {
 		Size = UDim2.new(1, 0, 0, 30), LayoutOrder = -1, BackgroundColor3 = T.panel, BorderSizePixel = 0, Parent = sPlr,
@@ -26,7 +37,7 @@ do
 	})
 
 	local panel = new("CanvasGroup", {
-		AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(PW, 318), BackgroundColor3 = T.bg,
+		AnchorPoint = Vector2.new(0, 0.5), Size = UDim2.fromOffset(PW, PH), BackgroundColor3 = T.bg,
 		BackgroundTransparency = 0.03, BorderSizePixel = 0, GroupTransparency = 1, Visible = false, Parent = screen,
 	})
 	corner(panel, 11)
@@ -198,9 +209,14 @@ do
 		end)
 		refreshButtons()
 		panel.Visible = true
-		panel.Size = UDim2.fromOffset(PW * 0.7, 318 * 0.7)
-		tween(panel, 0.8, { Size = UDim2.fromOffset(PW, 318) }, Enum.EasingStyle.Elastic)
+		-- target size is read at open time, and the heartbeat leaves it alone while
+		-- the elastic tween is still running
+		local w, h = panelSize()
+		panel.Size = UDim2.fromOffset(w * 0.7, h * 0.7)
+		PV.animating = true
+		tween(panel, 0.8, { Size = UDim2.fromOffset(w, h) }, Enum.EasingStyle.Elastic)
 		tween(panel, 0.22, { GroupTransparency = 0 })
+		task.delay(0.85, function() PV.animating = false end)
 	end
 
 	pbtn("TP", "TP", 1, T.accent, A.tpTo)
@@ -225,10 +241,16 @@ do
 		if PV.open then
 			panel.Visible = window.Visible and A.activeTab == "Players"
 			local vp = screen.AbsoluteSize
-			local pw = PW * pScale.Scale
+			local w, h = panelSize()
+			local pw = w * pScale.Scale
 			local x = ap.X + as.X + 10
 			if x + pw > vp.X then x = math.max(ap.X - pw - 10, 4) end
 			panel.Position = UDim2.fromOffset(x, ap.Y + as.Y / 2)
+			-- follow a resize: compare in on-screen pixels, because AbsoluteSize
+			-- already includes the panel's own UIScale
+			if not PV.animating and math.abs(panel.AbsoluteSize.X - pw) > 1 then
+				panel.Size = UDim2.fromOffset(w, h)
+			end
 		end
 		local _, _, mine = charParts()
 		for plr, m in pairs(PV.marks) do
