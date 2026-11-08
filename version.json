@@ -1,6 +1,6 @@
 {
-  "rev": 53,
-  "build": "2026-11-08.53",
-  "notes": "Every stage file is now fetched from a URL that carries the rev (?v=53), so a build can never be served half-old. raw.githubusercontent sits behind a CDN with a five-minute TTL keyed by path, which meant a push took up to five minutes to be visible and, worse, could hand a new loader an old copy of one file. Keying the URL on REV makes a bump a new cache key on every edge, so a new build lands immediately and can never mix with the previous one. The rev-52 focus fix rides along.",
+  "rev": 54,
+  "build": "2026-11-08.54",
+  "notes": "Launching by a cached path is over. raw.githubusercontent caches by path for 300s and this client was still being served a rev behind even with a changing query string, so the two places Aether re-launches itself - auto-execute on teleport, and the update restart - now resolve the current commit through api.github.com first and then fetch <commit>/main.lua. That path has never been cached, so a re-launch cannot land on the previous build. Both fall back to the old URL if the ref cannot be read.",
   "loader": "main.lua"
 }

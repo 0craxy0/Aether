@@ -69,8 +69,27 @@ local function ownSource(raw)
 	return raw
 end
 
+-- A query string does not bust every cache between here and raw.githubusercontent:
+-- this client kept being served a rev behind even with ?t=<time>. A *path* always
+-- does, so the re-launch paths resolve the current commit through the API (which
+-- is not the CDN that was lying to us) and then fetch that commit's loader.
+local function pinnedRunner(refUrl, rawBase, fallback)
+	return string.format([[
+do
+	local ok, ref = pcall(function()
+		return game:GetService("HttpService"):JSONDecode(game:HttpGet(%q .. "?t=" .. tostring(os.time())))
+	end)
+	local sha = ok and type(ref) == "table" and type(ref.object) == "table" and ref.object.sha or nil
+	local url = (type(sha) == "string") and (%q .. sha .. "/main.lua") or %q
+	loadstring(game:HttpGet(url))()
+end]], refUrl, rawBase, fallback)
+end
+
 local function buildQueue()
 	local src = ownSource(A.source) or ownSource(getgenv and getgenv().AetherSource)
+	if src and A.cmdRef and A.rawBase then
+		return pinnedRunner(A.cmdRef, A.rawBase, src)
+	end
 	if src then
 		return string.format("loadstring(game:HttpGet(%q))()", src)
 	end

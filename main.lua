@@ -62,9 +62,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-08.53"
+local BUILD = "2026-11-08.54"
 -- monotonic: the updater compares rev, never the date string
-local REV = 53
+local REV = 54
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -82,6 +82,16 @@ local function url(path)
 end
 
 local A = { base = BASE, build = BUILD, rev = REV }
+
+-- Repo root and the ref endpoint, derived from BASE rather than written twice.
+-- Both exist for one reason: the CDN in front of raw.githubusercontent serves by
+-- path with a 300s TTL, and it has handed this client an old build through a
+-- changing query string. Resolving the commit and then fetching <commit>/main.lua
+-- is a path nobody has cached, so a re-launch cannot land on the previous build.
+local RAW_BASE = BASE:match("^(https://raw%.githubusercontent%.com/[^/]+/[^/]+/)") or BASE
+local SLUG = RAW_BASE:match("raw%.githubusercontent%.com/([^/]+/[^/]+)/")
+A.rawBase = RAW_BASE
+A.cmdRef = SLUG and ("https://api.github.com/repos/" .. SLUG .. "/git/refs/heads/main") or nil
 
 -- Game shelf. It has to be decided here, before the first fetch, because FILES
 -- is filtered by it; core/games.lua only turns the key into a record for the UI

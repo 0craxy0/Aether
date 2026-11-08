@@ -178,7 +178,20 @@ function U.restart()
 		A.sfx("close")
 		if type(A.unload) == "function" then pcall(A.unload) end
 		task.wait(0.15)
-		local url = A.base .. "main.lua?t=" .. tostring(os.time())
+		-- Resolve the commit first, then load <commit>/main.lua. A query string is
+		-- not enough: the CDN in front of raw.githubusercontent caches by path and
+		-- was still serving the previous build to a client that changed its query.
+		local sha
+		if A.cmdRef then
+			local okRef, ref = pcall(function()
+				return HttpService:JSONDecode(game:HttpGet(A.cmdRef .. "?t=" .. tostring(os.time())))
+			end)
+			if okRef and type(ref) == "table" and type(ref.object) == "table" then
+				sha = ref.object.sha
+			end
+		end
+		local url = (A.rawBase and type(sha) == "string" and (A.rawBase .. sha .. "/main.lua"))
+			or (A.base .. "main.lua?t=" .. tostring(os.time()))
 		local okGet, src = pcall(game.HttpGet, game, url)
 		if not okGet or type(src) ~= "string" or #src > (2 * 1024 * 1024) then
 			return warn("[Aether] restart failed: could not download main.lua: " .. tostring(src))
