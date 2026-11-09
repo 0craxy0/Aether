@@ -24,10 +24,11 @@ local win = A.window
 if not win then return end
 
 -- Sized from the window, not from a constant: the panel is resizable and a menu
--- with a fixed 260px column looked cramped at 960 and lost in 420. Heights follow
--- the same idea, with floors so the label never clips.
-local COL_W = math.clamp(math.floor((A.W or 580) * 0.5), 220, 340)
-local BTN_H = math.clamp(math.floor((A.H or 430) * 0.093), 34, 46)
+-- with a fixed column looked cramped at 960 and lost in 420. Two thirds of the
+-- width is what a menu should be - it is the only thing on screen, so it fills the
+-- space instead of sitting in the middle of it.
+local COL_W = math.clamp(math.floor((A.W or 580) * 0.66), 300, 520)
+local BTN_H = math.clamp(math.floor((A.H or 430) * 0.115), 42, 64)
 
 local cover = new("Frame", {
 	Name = "MainMenu", Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.bg,
@@ -39,7 +40,7 @@ local column = new("Frame", {
 	Size = UDim2.fromOffset(COL_W, 0), AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1, ZIndex = 401, Parent = cover,
 }, {
-	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
+	new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
 
 local function line(props)
@@ -47,14 +48,14 @@ local function line(props)
 end
 
 local titleLbl = line({
-	Text = "AETHER", Font = FONT.bold, TextSize = 26, TextColor3 = T.text,
-	BackgroundTransparency = 1, LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 32), Parent = column,
+	Text = "AETHER", Font = FONT.bold, TextSize = 32, TextColor3 = T.text,
+	BackgroundTransparency = 1, LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 40), Parent = column,
 })
 
 local buildLbl = line({
 	Text = "build " .. tostring(A.build or "?") .. " · rev " .. tostring(A.rev or "?"),
-	Font = FONT.reg, TextSize = 10, TextColor3 = T.muted,
-	BackgroundTransparency = 1, LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 14), Parent = column,
+	Font = FONT.reg, TextSize = 11, TextColor3 = T.muted,
+	BackgroundTransparency = 1, LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 16), Parent = column,
 })
 
 local rule = new("Frame", {
@@ -73,7 +74,7 @@ end
 
 local function pageButton(parent, order, caption, onClick)
 	local b = new("TextButton", {
-		Text = caption, Font = FONT.med, TextSize = 13, TextColor3 = T.text,
+		Text = caption, Font = FONT.med, TextSize = 15, TextColor3 = T.text,
 		BackgroundColor3 = T.raised, BackgroundTransparency = 0.15, AutoButtonColor = false,
 		BorderSizePixel = 0, LayoutOrder = order, Size = UDim2.new(1, 0, 0, BTN_H), Parent = parent,
 	}, { new("UICorner", { CornerRadius = UDim.new(0, 8) }) })
@@ -107,14 +108,14 @@ local menuPage = new("Frame", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1, LayoutOrder = 4, ZIndex = 401, Parent = column,
 }, {
-	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
+	new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
 
 local creditsPage = new("Frame", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1, Visible = false, LayoutOrder = 5, ZIndex = 401, Parent = column,
 }, {
-	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
+	new("UIListLayout", { Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
 
 local enterBtn = pageButton(menuPage, 1, "Enter", nil)
@@ -123,7 +124,7 @@ local creditsBtn = pageButton(menuPage, 3, "Credits", nil)
 
 line({
 	Text = "the tab list is underneath this; the menu does not replace it",
-	Font = FONT.reg, TextSize = 10, TextColor3 = T.muted, TextWrapped = true,
+	Font = FONT.reg, TextSize = 11, TextColor3 = T.muted, TextWrapped = true,
 	BackgroundTransparency = 1, LayoutOrder = 4, Size = UDim2.new(1, 0, 0, 14), Parent = menuPage,
 })
 
@@ -153,7 +154,7 @@ local ownerLbl = line({
 
 line({
 	Text = "everything else: the people who actually play it",
-	Font = FONT.reg, TextSize = 10, TextColor3 = T.muted, TextWrapped = true,
+	Font = FONT.reg, TextSize = 11, TextColor3 = T.muted, TextWrapped = true,
 	BackgroundTransparency = 1, LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 26), Parent = creditsPage,
 })
 

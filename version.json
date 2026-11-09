@@ -1,6 +1,6 @@
 {
-  "rev": 77,
-  "build": "2026-11-08.77",
-  "notes": "The SETTINGS label on the menu's settings view had no BackgroundTransparency, so its own default label background painted as a full-width grey bar across the header. Every other label in the menu already set it. The buttons were also being drawn above the wordmark because their container had no LayoutOrder. The first version drew a small centred card and left the sidebar visible beside it, which was not what a main menu is. The loading bar completes, the panel does not appear on its own any more: a card takes its place with the wordmark, the build and rev, and Enter / Settings / Credits. Enter fades the hub in. Settings is a shortcut into the real Settings tab, not a second copy, so the tab list is unchanged once you are in. Credits resolves 1562524075 when the menu is built - display name and user name from the Players API, with the in-game player and a name lookup as fallbacks if the batch call is unavailable - so the card never shows a stale hardcoded name. The menu holds the window back rather than racing the reveal: it waits for loadingDone, hides the window and shadow, and restores both exactly where the reveal left them.",
+  "rev": 78,
+  "build": "2026-11-08.78",
+  "notes": "The menu is bigger: two thirds of the panel width instead of half, buttons a tenth taller with 15pt labels, wider spacing and a 32pt wordmark. It was filling the middle of the window rather than the window.
   "loader": "main.lua"
 }
