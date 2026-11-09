@@ -65,9 +65,9 @@ local FILES = {
 
 -- bumped whenever a push changes behaviour. Printed on load and shown in the
 -- window header, so "am I on the new build?" is a fact instead of a guess.
-local BUILD = "2026-11-08.83"
+local BUILD = "2026-11-08.84"
 -- monotonic: the updater compares rev, never the date string
-local REV = 83
+local REV = 84
 
 -- opt-in, for chasing a stale copy: set getgenv().AetherFresh = true before
 -- executing and every file is fetched with a unique URL, bypassing every cache
@@ -507,6 +507,46 @@ local function loadsWith(group)
 	return detectProfile(A.place) == group
 end
 
+-- Cache-first -------------------------------------------------------------------
+-- A launch that finds this exact build already on disk does not touch the network
+-- at all: no 42 requests, no commit lookup, no CDN, no rate limit. The manifest is
+-- written only by a load that finished, so a half-written folder is never trusted;
+-- if any single file is missing from it, that file (and only that file) is fetched.
+--
+-- The honest cost: a stale cache never heals itself, because the thing that would
+-- fix it - the download - is what we just skipped. Two escape hatches exist, and
+-- both are cheap: getgenv().AetherFresh = true ignores the cache entirely, and
+-- getgenv().AetherNoCache = true does the same without the query-string busting.
+local MANIFEST = CACHE_ROOT .. "manifest.json"
+local BYPASS_CACHE = FRESH or (getgenv ~= nil and getgenv().AetherNoCache == true)
+
+local function cacheComplete()
+	if BYPASS_CACHE or not cacheUsable then return false end
+	if type(isfile) ~= "function" then return false end
+	local okThere, there = pcall(isfile, MANIFEST)
+	if not okThere or not there then return false end
+	local okRead, raw = pcall(readfile, MANIFEST)
+	if not okRead or type(raw) ~= "string" or raw == "" then return false end
+	local okDecode, data = pcall(function()
+		return game:GetService("HttpService"):JSONDecode(raw)
+	end)
+	if not okDecode or type(data) ~= "table" or tonumber(data.rev) ~= REV then return false end
+	if type(data.files) ~= "table" then return false end
+
+	local have = {}
+	for _, f in ipairs(data.files) do
+		if type(f) == "table" and type(f.p) == "string" then have[f.p] = true end
+	end
+	-- this shelf's list, not the manifest's: a build that gains a file must not be
+	-- served from a cache written before that file existed
+	for _, entry in ipairs(FILES) do
+		if loadsWith(entry[2]) and not have[entry[1]] then return false end
+	end
+	return true
+end
+
+local FAST = cacheComplete()
+
 -- One filtered list drives both the prefetch and the execution, so the two can
 -- never disagree about what this shelf loads - and the order is still FILES order.
 
@@ -526,7 +566,7 @@ end
 -- not: a newer loader honouring an older pin would ask for pages that do not exist
 -- in that older tree and fail outright.
 local PINNED = false
-if A.cmdRef then
+if not FAST and A.cmdRef then
 	local ok, body = pcall(game.HttpGet, game, A.cmdRef .. "?t=" .. tostring(os.time()))
 	if ok and type(body) == "string" and #body < 8192 then
 		local okDecode, data = pcall(function()
@@ -540,7 +580,8 @@ if A.cmdRef then
 	end
 end
 if getgenv and getgenv().AetherDebug then
-	print("[Aether] stage base " .. BASE .. (PINNED and " (commit-pinned)" or " (unpinned: ref lookup failed)"))
+	print("[Aether] stage base " .. (FAST and "(cache: no network at all)" or BASE)
+		.. (FAST and "" or (PINNED and " (commit-pinned)" or " (unpinned: ref lookup failed)")))
 end
 
 local loadPaths = {}
@@ -552,14 +593,44 @@ local loadStart = os.clock()
 -- folder prep happens here, on this thread, so the cache writes spawned below
 -- cannot race each other into a directory that does not exist yet
 cachePrepare()
-prefetchStart(loadPaths) -- everything this shelf needs is already in flight
+if not FAST then
+	prefetchStart(loadPaths) -- everything this shelf needs is already in flight
+end
+
+-- written after the loop, never before: a manifest is a promise that every file in
+-- it is on disk and complete
+local sizes = {}
+local function writeManifest()
+	if not cacheUsable or type(writefile) ~= "function" then return end
+	local files = {}
+	for _, p in ipairs(loadPaths) do
+		files[#files + 1] = { p = p, n = sizes[p] or 0 }
+	end
+	local ok, encoded = pcall(function()
+		return game:GetService("HttpService"):JSONEncode({ rev = REV, build = BUILD, files = files })
+	end)
+	if ok and type(encoded) == "string" then pcall(writefile, MANIFEST, encoded) end
+end
+
+local fromCache = 0
 local lastYield = os.clock()
 for _, path in ipairs(loadPaths) do
 	if os.clock() - loadStart > BUDGET then
 		return fail("network too slow · gave up before " .. path)
 	end
 	local began = os.clock()
-	local src, why = fetch(path)
+	local src, why
+	if FAST then
+		src = cacheRead(path)
+		-- an empty file is not a cache hit: compile("") succeeds and the module
+		-- would silently never run
+		if src and #src == 0 then src = nil end
+	end
+	if src then
+		fromCache = fromCache + 1
+	else
+		src, why = fetch(path)
+	end
 	local spent = os.clock() - began
 	-- a stall is shown, not hidden: "it froze" and "that file is slow" should not
 	-- look the same, and the card is the only place the user can see the second
@@ -569,8 +640,22 @@ for _, path in ipairs(loadPaths) do
 	if not src then
 		return fail("could not download " .. path .. ": " .. tostring(why))
 	end
+	sizes[path] = #src
 	local fn, compileErr = loadstring(src, "@" .. path)
+	if not fn and FAST then
+		-- a cache hit can only be wrong one way: a truncated write. Repair that
+		-- file from the network instead of refusing to start on every launch.
+		local fresh = fetchTimed(path, RETRY_TIMEOUT)
+		if fresh and #fresh > 0 then
+			src = fresh
+			sizes[path] = #src
+			fn, compileErr = loadstring(fresh, "@" .. path)
+		end
+	end
 	if not fn then
+		-- and if the download is wrong too, drop the manifest so the next launch
+		-- does a full fetch rather than repeating this
+		if cacheUsable and type(delfile) == "function" then pcall(delfile, MANIFEST) end
 		return fail("syntax error in " .. path .. ": " .. tostring(compileErr))
 	end
 	local okRun, runErr = pcall(fn, A)
@@ -593,10 +678,20 @@ end
 -- leave the bar one short forever on a non-owner client, where tail/admin.lua
 -- returns before it can announce itself. A.afterLoad is tail/startup.lua's
 -- reveal, so the panel's first frame happens after this card is gone.
+writeManifest()
 A.loadMs = math.floor((os.clock() - loadStart) * 1000 + 0.5)
-A.filesLoaded = #queue
+A.filesLoaded = #loadPaths
 if getgenv and getgenv().AetherDebug then
-	print(string.format("[Aether] %d files fetched, compiled and run in %d ms (prefetch pool %d)",
-		#queue, A.loadMs, POOL))
+	print(string.format("[Aether] %d files, %d from cache, compiled and run in %d ms (prefetch pool %d)",
+		#loadPaths, fromCache, A.loadMs, POOL))
 end
 if loading then pcall(loading.done, A.afterLoad) end
+
+-- A cached launch skipped the download, so it also skipped the moment this client
+-- would otherwise have noticed a newer build. The updater polls on its own anyway;
+-- this just asks it once, off the load thread, and lets its usual prompt do the rest.
+if fromCache > 0 then
+	task.delay(1.5, function()
+		if A.updater and A.updater.checkNow then pcall(A.updater.checkNow) end
+	end)
+end

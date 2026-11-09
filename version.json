@@ -1,6 +1,6 @@
 {
-  "rev": 83,
-  "build": "2026-11-08.83",
-  "notes": "The disclaimer page lost its byline name and its non-ASCII punctuation: a PowerShell round-trip had double-encoded the em dashes, arrows and middle dots into mojibake, so the copy read as "days straight Ae" instead of "days straight -". Everything on that page is ASCII now. Paragraphs brighten under the cursor. The barrier now runs the same drag maths and edge physics as the header, and the shadow follows. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
+  "rev": 84,
+  "build": "2026-11-08.84",
+  "notes": "Cache-first loading. A launch that finds this exact build on disk no longer touches the network at all: no 42 requests, no commit lookup, no CDN, no rate limit - just readfile and compile, which is milliseconds instead of a download. The loader decides with a manifest written only by a load that finished, so a half-written folder is never trusted; if a single file is missing it is fetched on its own, and if a cached file will not compile it is repaired from the network rather than failing every launch. Escape hatches: getgenv().AetherFresh (ignore the cache, bust queries) and getgenv().AetherNoCache (ignore the cache). A cached launch asks the updater to look once, off the load thread, so a new build is still noticed immediately - cache-first must never mean stuck.",
   "loader": "main.lua"
 }
