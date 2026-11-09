@@ -1,6 +1,6 @@
 {
-  "rev": 72,
-  "build": "2026-11-08.72",
-  "notes": "Rows that are not self-explanatory now end their label with a small '?'. Put the pointer on it and a tooltip the size of its own text appears - wrapped, clamped to the screen, and placed below the mark or above it when there is no room underneath. Twenty-six rows have one, spread across Character, Visuals, World, UI, Settings, Send a Global Message and the owner panel; anything guessable from the name (Noclip, Fullbright, WalkSpeed) is untouched, so a row with an explanation looks like a row that has one. The mark sits where the label ends, measured with TextService, and above the row's own hit area so a toggle's transparent button does not swallow the hover. A.help(name, text) is public and a row that is not on this shelf is a no-op. 72 moves the badge into place on the next frame as well, since a row built into a page that has not been laid out yet is still zero wide when it is decorated.",
+  "rev": 73,
+  "build": "2026-11-08.73",
+  "notes": "A main menu after the load finishes. The loading bar completes, the panel does not appear on its own any more: a card takes its place with the wordmark, the build and rev, and Enter / Settings / Credits. Enter fades the hub in. Settings is a shortcut into the real Settings tab, not a second copy, so the tab list is unchanged once you are in. Credits resolves 1562524075 when the menu is built - display name and user name from the Players API, with the in-game player and a name lookup as fallbacks if the batch call is unavailable - so the card never shows a stale hardcoded name. The menu holds the window back rather than racing the reveal: it waits for loadingDone, hides the window and shadow, and restores both exactly where the reveal left them.",
   "loader": "main.lua"
 }
