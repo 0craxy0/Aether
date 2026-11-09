@@ -182,7 +182,7 @@ local settingsHead = new("Frame", {
 
 line({
 	Text = "SETTINGS", Font = FONT.bold, TextSize = 10, TextColor3 = T.muted,
-	TextXAlignment = Enum.TextXAlignment.Left,
+	TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1,
 	Position = UDim2.fromOffset(2, 0), Size = UDim2.new(1, -90, 1, 0), Parent = settingsHead,
 })
 
