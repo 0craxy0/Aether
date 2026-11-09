@@ -46,6 +46,37 @@ local catcher = new("TextButton", {
 })
 catcher.MouseButton1Click:Connect(function() end)
 
+-- Draggable, the same way the header is. The cover sits on top of the header, so
+-- without this the panel cannot be moved while the menu is up - the drag hook lives
+-- on the header, and the catcher is what the pointer actually hits. Same maths and
+-- the same edge physics as core/window.lua, so it feels like one window.
+do
+	local EL = A.EL
+	local dragging, startPos, origin
+	catcher.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			dragging, startPos, origin = true, i.Position, win.Position
+			if EL and EL.grab then pcall(EL.grab, win.Position, win.AbsoluteSize) end
+		end
+	end)
+	UIS.InputChanged:Connect(function(i)
+		if not dragging then return end
+		if i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch then
+			local d = i.Position - startPos
+			local pos = UDim2.new(origin.X.Scale, origin.X.Offset + d.X, origin.Y.Scale, origin.Y.Offset + d.Y)
+			if EL and EL.pos then pos = EL.pos(pos, win.AbsoluteSize) end
+			win.Position = pos
+			if A.shadow then A.shadow.Position = pos end
+		end
+	end)
+	UIS.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			if dragging and EL and EL.release then pcall(EL.release) end
+			dragging = false
+		end
+	end)
+end
+
 local column = new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
 	Size = UDim2.fromOffset(COL_W, 0), AutomaticSize = Enum.AutomaticSize.Y,

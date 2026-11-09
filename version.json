@@ -1,6 +1,6 @@
 {
-  "rev": 79,
-  "build": "2026-11-08.79",
-  "notes": "The menu now blocks input: a Frame draws over the panel but does not consume clicks, so the real page underneath was still receiving them through the cover. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
+  "rev": 80,
+  "build": "2026-11-08.80",
+  "notes": "The menu is draggable: it covers the header, so the panel could not be moved while it was up. The barrier now runs the same drag maths and edge physics as the header, and the shadow follows. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
   "loader": "main.lua"
 }
