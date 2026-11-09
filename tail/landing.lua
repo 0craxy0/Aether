@@ -35,6 +35,17 @@ local cover = new("Frame", {
 	BackgroundTransparency = 0, BorderSizePixel = 0, ZIndex = 400, Parent = win,
 }, { new("UICorner", { CornerRadius = UDim.new(0, A.windowCorner or 19) }) })
 
+-- Input barrier. A plain Frame does not consume clicks - it draws over the panel
+-- and everything under it still receives the press - so the menu needs a real
+-- button covering its whole area, under the content, or you can play the Settings
+-- page through the cover. ZIndex 400 puts it above the window and below the
+-- column/views at 401-402, so the menu's own buttons stay clickable.
+local catcher = new("TextButton", {
+	Text = "", AutoButtonColor = false, BackgroundTransparency = 1, BorderSizePixel = 0,
+	Size = UDim2.fromScale(1, 1), ZIndex = 400, Parent = cover,
+})
+catcher.MouseButton1Click:Connect(function() end)
+
 local column = new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
 	Size = UDim2.fromOffset(COL_W, 0), AutomaticSize = Enum.AutomaticSize.Y,

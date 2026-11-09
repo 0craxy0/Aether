@@ -1,6 +1,6 @@
 {
-  "rev": 78,
-  "build": "2026-11-08.78",
-  "notes": "The menu is bigger: two thirds of the panel width instead of half, buttons a tenth taller with 15pt labels, wider spacing and a 32pt wordmark. It was filling the middle of the window rather than the window.
+  "rev": 79,
+  "build": "2026-11-08.79",
+  "notes": "The menu now blocks input: a Frame draws over the panel but does not consume clicks, so the real page underneath was still receiving them through the cover. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
   "loader": "main.lua"
 }
