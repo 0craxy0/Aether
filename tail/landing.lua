@@ -118,7 +118,7 @@ line({
 })
 
 local lookBtn = new("TextButton", {
-	Text = "Look into it →", Font = FONT.bold, TextSize = 11, TextColor3 = ORANGE,
+	Text = "Look into it â†’", Font = FONT.bold, TextSize = 11, TextColor3 = ORANGE,
 	BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 16), Parent = notice,
@@ -132,7 +132,7 @@ local titleLbl = line({
 })
 
 local buildLbl = line({
-	Text = "build " .. tostring(A.build or "?") .. " · rev " .. tostring(A.rev or "?"),
+	Text = "build " .. tostring(A.build or "?") .. " Â· rev " .. tostring(A.rev or "?"),
 	Font = FONT.reg, TextSize = 11, TextColor3 = T.muted,
 	BackgroundTransparency = 1, LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 16), Parent = column,
 })
@@ -226,7 +226,7 @@ line({
 })
 
 local ownerLbl = line({
-	Text = "resolving…", Font = FONT.med, TextSize = 14, TextColor3 = T.text,
+	Text = "resolvingâ€¦", Font = FONT.med, TextSize = 14, TextColor3 = T.text,
 	TextWrapped = true, BackgroundTransparency = 1,
 	LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 20), Parent = creditsPage,
 })
@@ -243,77 +243,110 @@ pageButton(creditsPage, 4, "Back", function()
 end)
 
 ------------------------------------------------------------------ notice page --
--- The long version, full-cover, no sidebar - it is a letter, not a settings
--- screen. Reached from the orange banner and nothing else.
+-- Modelled on an openai.com index post: one centred column, a very short hero,
+-- centred body copy, a lot of air above it, and no chrome at all - the way out is a
+-- text link at the end rather than a button in a header. Body copy brightens under
+-- the cursor, which is the only interaction on the page.
 local noticeView = new("Frame", {
 	Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false,
 	ZIndex = 402, Parent = cover,
+})
+
+local postScroll = new("ScrollingFrame", {
+	Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0,
+	CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 2, ScrollBarImageColor3 = T.stroke, ZIndex = 402,
+	Parent = noticeView,
 }, {
 	new("UIPadding", {
-		PaddingTop = UDim.new(0, 14), PaddingBottom = UDim.new(0, 14),
-		PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16),
+		PaddingTop = UDim.new(0, 44), PaddingBottom = UDim.new(0, 40),
+		PaddingLeft = UDim.new(0, 36), PaddingRight = UDim.new(0, 36),
 	}),
 })
 
-local noticeHead = new("Frame", {
-	Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, ZIndex = 402, Parent = noticeView,
+local post = new("Frame", {
+	AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 0),
+	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundTransparency = 1, ZIndex = 402, Parent = postScroll,
+}, {
+	new("UIListLayout", {
+		Padding = UDim.new(0, 16), SortOrder = Enum.SortOrder.LayoutOrder,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+	}),
 })
 
-line({
-	Text = "WHY THE PAUSE", Font = FONT.bold, TextSize = 10, TextColor3 = ORANGE,
-	TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1,
-	Position = UDim2.fromOffset(2, 0), Size = UDim2.new(1, -90, 1, 0), Parent = noticeHead,
+local order = 0
+local function block(props)
+	order = order + 1
+	props.LayoutOrder = order
+	if not props.Size then props.Size = UDim2.new(1, 0, 0, 0) end
+	props.AutomaticSize = props.AutomaticSize or Enum.AutomaticSize.Y
+	props.BackgroundTransparency = props.BackgroundTransparency or 1
+	props.TextXAlignment = props.TextXAlignment or Enum.TextXAlignment.Center
+	props.Parent = post
+	return line(props)
+end
+
+block({
+	Text = "A NOTE", Font = FONT.bold, TextSize = 10, TextColor3 = ORANGE,
+	Size = UDim2.new(1, 0, 0, 12),
 })
 
-local noticeBack = new("TextButton", {
-	Text = "Back", Font = FONT.med, TextSize = 11, TextColor3 = T.text,
-	BackgroundColor3 = T.raised, BackgroundTransparency = 0.2, AutoButtonColor = false,
-	BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
-	Size = UDim2.fromOffset(64, 26), Parent = noticeHead,
-}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }) })
-noticeBack.MouseEnter:Connect(function()
-	tween(noticeBack, 0.12, { BackgroundTransparency = 0 })
-	if sfx then pcall(sfx, "hover") end
-end)
-noticeBack.MouseLeave:Connect(function() tween(noticeBack, 0.12, { BackgroundTransparency = 0.2 }) end)
-noticeBack.MouseButton1Click:Connect(function()
+block({
+	Text = "A month of fixes.", Font = FONT.bold, TextSize = 30, TextColor3 = T.text,
+	TextWrapped = true, Size = UDim2.new(1, 0, 0, 38),
+})
+
+block({
+	Text = "Lenny Singh  Â·  9 November 2026", Font = FONT.reg, TextSize = 10,
+	TextColor3 = T.muted, Size = UDim2.new(1, 0, 0, 13),
+})
+
+-- body paragraphs, each one brightening when the pointer is over it
+local function paragraph(text, size)
+	local lbl = block({
+		Text = text, Font = FONT.reg, TextSize = size or 12, TextColor3 = T.muted,
+		TextWrapped = true,
+	})
+	lbl.MouseEnter:Connect(function() tween(lbl, 0.18, { TextColor3 = T.text }) end)
+	lbl.MouseLeave:Connect(function() tween(lbl, 0.22, { TextColor3 = T.muted }) end)
+	return lbl
+end
+
+paragraph("I've been shipping for days straight â€” tens of features a day â€” and I've reached the point where that pace is no longer something I can keep up.")
+
+paragraph("So for the next month or so, this build is on a diet.")
+
+paragraph("Medium to severe bug fixes.")
+paragraph("Deprecation â€” removing what has stopped working.")
+paragraph("Anything that is genuinely broken.")
+
+paragraph("No new features, no redesigns, no new game support in that window. Everything already in the build keeps working, and keeps being maintained.")
+
+paragraph("After that it goes back to normal.")
+
+paragraph("Thanks for the reports â€” they are most of the reason this is worth maintaining at all.")
+
+local backLink = new("TextButton", {
+	Text = "â†  Back to menu", Font = FONT.med, TextSize = 11, TextColor3 = ORANGE,
+	BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0,
+	TextXAlignment = Enum.TextXAlignment.Center,
+	LayoutOrder = 100, Size = UDim2.new(1, 0, 0, 20), Parent = post,
+})
+backLink.MouseEnter:Connect(function() tween(backLink, 0.15, { TextColor3 = Color3.fromHex("FFC46B") }) end)
+backLink.MouseLeave:Connect(function() tween(backLink, 0.15, { TextColor3 = ORANGE }) end)
+backLink.MouseButton1Click:Connect(function()
 	if sfx then pcall(sfx, "tap") end
 	noticeView.Visible = false
 	column.Visible = true
 	menuPage.Visible = true
 end)
 
-local noticeScroll = new("ScrollingFrame", {
-	Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 1, -38),
-	BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 402,
-	CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
-	ScrollBarThickness = 3, ScrollBarImageColor3 = T.stroke, Parent = noticeView,
-})
-
-line({
-	Text = table.concat({
-		"I've been shipping for days straight - tens of features a day, every day - and I've hit the point where that pace stops being something I can keep up.",
-		"",
-		"Rather than stop dead or keep pushing while the quality slides, the next month or so is on a diet. What still gets done:",
-		"",
-		"   •  medium to severe bug fixes",
-		"   •  deprecation - removing what has stopped working",
-		"   •  anything that is genuinely broken, fixed",
-		"",
-		"No new feature drops, no redesigns, no new game support in that window. Everything already in the build keeps working and keeps being maintained.",
-		"",
-		"After that it goes back to normal. Thanks for using it - and for reporting the things that broke, which is most of why this is worth maintaining at all.",
-	}, "\n"),
-	Font = FONT.reg, TextSize = 11, TextColor3 = T.text, TextWrapped = true,
-	TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
-	BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0),
-	AutomaticSize = Enum.AutomaticSize.Y, Parent = noticeScroll,
-})
-
 lookBtn.MouseButton1Click:Connect(function()
 	column.Visible = false
 	noticeView.Visible = true
 end)
+
 
 -------------------------------------------------------------------- settings --
 -- The whole Settings page, lifted out of the page stack. The page owns a single

@@ -1,6 +1,6 @@
 {
-  "rev": 81,
-  "build": "2026-11-08.81",
-  "notes": "An orange disclaimer sits at the top of the main menu - translucent fill, slightly stronger outline, and a Look into it link that opens a full-cover letter in place of the menu explaining why the next month is bug fixes and deprecation only. The barrier now runs the same drag maths and edge physics as the header, and the shadow follows. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
+  "rev": 82,
+  "build": "2026-11-08.82",
+  "notes": "The disclaimer page is now laid out like an openai.com index post: one centred column, a very short hero under a small orange eyebrow, a byline line, centred body copy with generous spacing, and no header or button chrome at all - the way out is a text link at the end. Paragraphs brighten under the cursor. The barrier now runs the same drag maths and edge physics as the header, and the shadow follows. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
   "loader": "main.lua"
 }
