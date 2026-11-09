@@ -89,6 +89,43 @@ local function line(props)
 	return new("TextLabel", props)
 end
 
+-- Disclaimer ---------------------------------------------------------------
+-- Orange, translucent, and at the top of the column: the one thing on this menu
+-- that is about the script rather than about opening it. "Look into it" opens a
+-- full-page note in place of the menu, so the explanation never competes with the
+-- buttons for space.
+local ORANGE = Color3.fromHex("FF9F0A")
+
+local notice = new("Frame", {
+	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
+	BackgroundColor3 = ORANGE, BackgroundTransparency = 0.82, BorderSizePixel = 0,
+	LayoutOrder = 0, ZIndex = 401, Parent = column,
+}, {
+	new("UICorner", { CornerRadius = UDim.new(0, 9) }),
+	new("UIStroke", { Color = ORANGE, Transparency = 0.45, Thickness = 1 }),
+	new("UIPadding", {
+		PaddingTop = UDim.new(0, 9), PaddingBottom = UDim.new(0, 8),
+		PaddingLeft = UDim.new(0, 11), PaddingRight = UDim.new(0, 11),
+	}),
+	new("UIListLayout", { Padding = UDim.new(0, 6), SortOrder = Enum.SortOrder.LayoutOrder }),
+})
+
+line({
+	Text = "Sorry, there won't be many updates to this script for approximately a month.",
+	Font = FONT.reg, TextSize = 11, TextColor3 = T.text, TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1,
+	LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Parent = notice,
+})
+
+local lookBtn = new("TextButton", {
+	Text = "Look into it →", Font = FONT.bold, TextSize = 11, TextColor3 = ORANGE,
+	BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0,
+	TextXAlignment = Enum.TextXAlignment.Left,
+	LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 16), Parent = notice,
+})
+lookBtn.MouseEnter:Connect(function() tween(lookBtn, 0.12, { TextColor3 = Color3.fromHex("FFC46B") }) end)
+lookBtn.MouseLeave:Connect(function() tween(lookBtn, 0.12, { TextColor3 = ORANGE }) end)
+
 local titleLbl = line({
 	Text = "AETHER", Font = FONT.bold, TextSize = 32, TextColor3 = T.text,
 	BackgroundTransparency = 1, LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 40), Parent = column,
@@ -203,6 +240,79 @@ line({
 pageButton(creditsPage, 4, "Back", function()
 	creditsPage.Visible = false
 	menuPage.Visible = true
+end)
+
+------------------------------------------------------------------ notice page --
+-- The long version, full-cover, no sidebar - it is a letter, not a settings
+-- screen. Reached from the orange banner and nothing else.
+local noticeView = new("Frame", {
+	Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false,
+	ZIndex = 402, Parent = cover,
+}, {
+	new("UIPadding", {
+		PaddingTop = UDim.new(0, 14), PaddingBottom = UDim.new(0, 14),
+		PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16),
+	}),
+})
+
+local noticeHead = new("Frame", {
+	Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1, ZIndex = 402, Parent = noticeView,
+})
+
+line({
+	Text = "WHY THE PAUSE", Font = FONT.bold, TextSize = 10, TextColor3 = ORANGE,
+	TextXAlignment = Enum.TextXAlignment.Left, BackgroundTransparency = 1,
+	Position = UDim2.fromOffset(2, 0), Size = UDim2.new(1, -90, 1, 0), Parent = noticeHead,
+})
+
+local noticeBack = new("TextButton", {
+	Text = "Back", Font = FONT.med, TextSize = 11, TextColor3 = T.text,
+	BackgroundColor3 = T.raised, BackgroundTransparency = 0.2, AutoButtonColor = false,
+	BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
+	Size = UDim2.fromOffset(64, 26), Parent = noticeHead,
+}, { new("UICorner", { CornerRadius = UDim.new(0, 7) }) })
+noticeBack.MouseEnter:Connect(function()
+	tween(noticeBack, 0.12, { BackgroundTransparency = 0 })
+	if sfx then pcall(sfx, "hover") end
+end)
+noticeBack.MouseLeave:Connect(function() tween(noticeBack, 0.12, { BackgroundTransparency = 0.2 }) end)
+noticeBack.MouseButton1Click:Connect(function()
+	if sfx then pcall(sfx, "tap") end
+	noticeView.Visible = false
+	column.Visible = true
+	menuPage.Visible = true
+end)
+
+local noticeScroll = new("ScrollingFrame", {
+	Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 1, -38),
+	BackgroundTransparency = 1, BorderSizePixel = 0, ZIndex = 402,
+	CanvasSize = UDim2.new(), AutomaticCanvasSize = Enum.AutomaticSize.Y,
+	ScrollBarThickness = 3, ScrollBarImageColor3 = T.stroke, Parent = noticeView,
+})
+
+line({
+	Text = table.concat({
+		"I've been shipping for days straight - tens of features a day, every day - and I've hit the point where that pace stops being something I can keep up.",
+		"",
+		"Rather than stop dead or keep pushing while the quality slides, the next month or so is on a diet. What still gets done:",
+		"",
+		"   •  medium to severe bug fixes",
+		"   •  deprecation - removing what has stopped working",
+		"   •  anything that is genuinely broken, fixed",
+		"",
+		"No new feature drops, no redesigns, no new game support in that window. Everything already in the build keeps working and keeps being maintained.",
+		"",
+		"After that it goes back to normal. Thanks for using it - and for reporting the things that broke, which is most of why this is worth maintaining at all.",
+	}, "\n"),
+	Font = FONT.reg, TextSize = 11, TextColor3 = T.text, TextWrapped = true,
+	TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top,
+	BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0),
+	AutomaticSize = Enum.AutomaticSize.Y, Parent = noticeScroll,
+})
+
+lookBtn.MouseButton1Click:Connect(function()
+	column.Visible = false
+	noticeView.Visible = true
 end)
 
 -------------------------------------------------------------------- settings --

@@ -1,6 +1,6 @@
 {
-  "rev": 80,
-  "build": "2026-11-08.80",
-  "notes": "The menu is draggable: it covers the header, so the panel could not be moved while it was up. The barrier now runs the same drag maths and edge physics as the header, and the shadow follows. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
+  "rev": 81,
+  "build": "2026-11-08.81",
+  "notes": "An orange disclaimer sits at the top of the main menu - translucent fill, slightly stronger outline, and a Look into it link that opens a full-cover letter in place of the menu explaining why the next month is bug fixes and deprecation only. The barrier now runs the same drag maths and edge physics as the header, and the shadow follows. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
   "loader": "main.lua"
 }
