@@ -118,7 +118,7 @@ line({
 })
 
 local lookBtn = new("TextButton", {
-	Text = "Look into it â†’", Font = FONT.bold, TextSize = 11, TextColor3 = ORANGE,
+	Text = "Look into it  ->", Font = FONT.bold, TextSize = 11, TextColor3 = ORANGE,
 	BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0,
 	TextXAlignment = Enum.TextXAlignment.Left,
 	LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 16), Parent = notice,
@@ -132,7 +132,7 @@ local titleLbl = line({
 })
 
 local buildLbl = line({
-	Text = "build " .. tostring(A.build or "?") .. " Â· rev " .. tostring(A.rev or "?"),
+	Text = "build " .. tostring(A.build or "?") .. "  /  rev " .. tostring(A.rev or "?"),
 	Font = FONT.reg, TextSize = 11, TextColor3 = T.muted,
 	BackgroundTransparency = 1, LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 16), Parent = column,
 })
@@ -226,7 +226,7 @@ line({
 })
 
 local ownerLbl = line({
-	Text = "resolvingâ€¦", Font = FONT.med, TextSize = 14, TextColor3 = T.text,
+	Text = "resolving...", Font = FONT.med, TextSize = 14, TextColor3 = T.text,
 	TextWrapped = true, BackgroundTransparency = 1,
 	LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 20), Parent = creditsPage,
 })
@@ -298,7 +298,7 @@ block({
 })
 
 block({
-	Text = "Lenny Singh  Â·  9 November 2026", Font = FONT.reg, TextSize = 10,
+	Text = "Aether  /  9 November 2026", Font = FONT.reg, TextSize = 10,
 	TextColor3 = T.muted, Size = UDim2.new(1, 0, 0, 13),
 })
 
@@ -313,22 +313,22 @@ local function paragraph(text, size)
 	return lbl
 end
 
-paragraph("I've been shipping for days straight â€” tens of features a day â€” and I've reached the point where that pace is no longer something I can keep up.")
+paragraph("I've been shipping for days straight - tens of features a day - and I've reached the point where that pace is no longer something I can keep up.")
 
 paragraph("So for the next month or so, this build is on a diet.")
 
 paragraph("Medium to severe bug fixes.")
-paragraph("Deprecation â€” removing what has stopped working.")
+paragraph("Deprecation - removing what has stopped working.")
 paragraph("Anything that is genuinely broken.")
 
 paragraph("No new features, no redesigns, no new game support in that window. Everything already in the build keeps working, and keeps being maintained.")
 
 paragraph("After that it goes back to normal.")
 
-paragraph("Thanks for the reports â€” they are most of the reason this is worth maintaining at all.")
+paragraph("Thanks for the reports - they are most of the reason this is worth maintaining at all.")
 
 local backLink = new("TextButton", {
-	Text = "â†  Back to menu", Font = FONT.med, TextSize = 11, TextColor3 = ORANGE,
+	Text = "<-  Back to menu", Font = FONT.med, TextSize = 11, TextColor3 = ORANGE,
 	BackgroundTransparency = 1, AutoButtonColor = false, BorderSizePixel = 0,
 	TextXAlignment = Enum.TextXAlignment.Center,
 	LayoutOrder = 100, Size = UDim2.new(1, 0, 0, 20), Parent = post,

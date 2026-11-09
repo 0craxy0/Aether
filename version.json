@@ -1,6 +1,6 @@
 {
-  "rev": 82,
-  "build": "2026-11-08.82",
-  "notes": "The disclaimer page is now laid out like an openai.com index post: one centred column, a very short hero under a small orange eyebrow, a byline line, centred body copy with generous spacing, and no header or button chrome at all - the way out is a text link at the end. Paragraphs brighten under the cursor. The barrier now runs the same drag maths and edge physics as the header, and the shadow follows. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
+  "rev": 83,
+  "build": "2026-11-08.83",
+  "notes": "The disclaimer page lost its byline name and its non-ASCII punctuation: a PowerShell round-trip had double-encoded the em dashes, arrows and middle dots into mojibake, so the copy read as "days straight Ae" instead of "days straight -". Everything on that page is ASCII now. Paragraphs brighten under the cursor. The barrier now runs the same drag maths and edge physics as the header, and the shadow follows. A full-size transparent TextButton now sits between the two. It was filling the middle of the window rather than the window.
   "loader": "main.lua"
 }
