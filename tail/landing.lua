@@ -17,10 +17,17 @@ local A = ...
 local T, FONT = A.T, A.FONT
 local new, tween = A.new, A.tween
 local Players, onCleanup = A.Players, A.onCleanup
+local motion, sfx, UIS = A.motion, A.sfx, A.UserInputService
 
 local OWNER_ID = 1562524075
 local win = A.window
 if not win then return end
+
+-- Sized from the window, not from a constant: the panel is resizable and a menu
+-- with a fixed 260px column looked cramped at 960 and lost in 420. Heights follow
+-- the same idea, with floors so the label never clips.
+local COL_W = math.clamp(math.floor((A.W or 580) * 0.5), 220, 340)
+local BTN_H = math.clamp(math.floor((A.H or 430) * 0.093), 34, 46)
 
 local cover = new("Frame", {
 	Name = "MainMenu", Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.bg,
@@ -29,7 +36,7 @@ local cover = new("Frame", {
 
 local column = new("Frame", {
 	AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5),
-	Size = UDim2.fromOffset(260, 0), AutomaticSize = Enum.AutomaticSize.Y,
+	Size = UDim2.fromOffset(COL_W, 0), AutomaticSize = Enum.AutomaticSize.Y,
 	BackgroundTransparency = 1, ZIndex = 401, Parent = cover,
 }, {
 	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
@@ -39,27 +46,36 @@ local function line(props)
 	return new("TextLabel", props)
 end
 
-line({
+local titleLbl = line({
 	Text = "AETHER", Font = FONT.bold, TextSize = 26, TextColor3 = T.text,
 	BackgroundTransparency = 1, LayoutOrder = 1, Size = UDim2.new(1, 0, 0, 32), Parent = column,
 })
 
-line({
+local buildLbl = line({
 	Text = "build " .. tostring(A.build or "?") .. " · rev " .. tostring(A.rev or "?"),
 	Font = FONT.reg, TextSize = 10, TextColor3 = T.muted,
 	BackgroundTransparency = 1, LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 14), Parent = column,
 })
 
-new("Frame", {
+local rule = new("Frame", {
 	BackgroundColor3 = T.stroke, BackgroundTransparency = 0.35, BorderSizePixel = 0,
 	LayoutOrder = 3, Size = UDim2.new(1, 0, 0, 1), Parent = column,
 })
+
+-- The same three things every widget in the panel does: lean toward the cursor,
+-- ripple where you press, and answer with a sound. Without them the menu read as
+-- a different program that happened to share the colours.
+local function pointerIn(obj)
+	local m = UIS:GetMouseLocation()
+	local inset = A.guiInset or 0
+	return m.X - obj.AbsolutePosition.X, m.Y - inset - obj.AbsolutePosition.Y
+end
 
 local function pageButton(parent, order, caption, onClick)
 	local b = new("TextButton", {
 		Text = caption, Font = FONT.med, TextSize = 13, TextColor3 = T.text,
 		BackgroundColor3 = T.raised, BackgroundTransparency = 0.15, AutoButtonColor = false,
-		BorderSizePixel = 0, LayoutOrder = order, Size = UDim2.new(1, 0, 0, 40), Parent = parent,
+		BorderSizePixel = 0, LayoutOrder = order, Size = UDim2.new(1, 0, 0, BTN_H), Parent = parent,
 	}, { new("UICorner", { CornerRadius = UDim.new(0, 8) }) })
 	local st = new("UIStroke", {
 		Color = T.stroke, Transparency = 0.5, Thickness = 1,
@@ -68,26 +84,35 @@ local function pageButton(parent, order, caption, onClick)
 	b.MouseEnter:Connect(function()
 		tween(b, 0.12, { BackgroundTransparency = 0, TextColor3 = T.accent })
 		st.Transparency = 0.15
+		if motion then pcall(motion.magnet, b, 30, 3) end
+		if sfx then pcall(sfx, "hover") end
 	end)
 	b.MouseLeave:Connect(function()
 		tween(b, 0.14, { BackgroundTransparency = 0.15, TextColor3 = T.text })
 		st.Transparency = 0.5
 	end)
-	b.MouseButton1Click:Connect(function() pcall(onClick) end)
+	b.MouseButton1Click:Connect(function()
+		if motion then
+			local px, py = pointerIn(b)
+			pcall(motion.ripple, b, px, py)
+		end
+		if sfx then pcall(sfx, "tap") end
+		pcall(onClick)
+	end)
 	return b
 end
 
 ----------------------------------------------------------------------- pages --
 local menuPage = new("Frame", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-	BackgroundTransparency = 1, ZIndex = 401, Parent = column,
+	BackgroundTransparency = 1, LayoutOrder = 4, ZIndex = 401, Parent = column,
 }, {
 	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
 
 local creditsPage = new("Frame", {
 	Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y,
-	BackgroundTransparency = 1, Visible = false, ZIndex = 401, Parent = column,
+	BackgroundTransparency = 1, Visible = false, LayoutOrder = 5, ZIndex = 401, Parent = column,
 }, {
 	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder }),
 })
@@ -101,6 +126,19 @@ line({
 	Font = FONT.reg, TextSize = 10, TextColor3 = T.muted, TextWrapped = true,
 	BackgroundTransparency = 1, LayoutOrder = 4, Size = UDim2.new(1, 0, 0, 14), Parent = menuPage,
 })
+
+-- entrance, the same shape as a page switch: the rows settle in one after another
+-- and the wordmark fades up behind them
+if motion and motion.reveal then pcall(motion.reveal, menuPage) end
+titleLbl.TextTransparency, buildLbl.TextTransparency = 1, 1
+rule.BackgroundTransparency = 1
+tween(titleLbl, 0.32, { TextTransparency = 0 })
+task.delay(0.05, function()
+	if buildLbl.Parent then tween(buildLbl, 0.32, { TextTransparency = 0 }) end
+end)
+task.delay(0.1, function()
+	if rule.Parent then tween(rule, 0.4, { BackgroundTransparency = 0.35 }) end
+end)
 
 line({
 	Text = "CREDITS", Font = FONT.bold, TextSize = 9, TextColor3 = T.muted,
@@ -154,8 +192,14 @@ local settingsBack = new("TextButton", {
 	BorderSizePixel = 0, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0),
 	Size = UDim2.fromOffset(64, 26), Parent = settingsHead,
 }, { new("UICorner", { CornerRadius = UDim.new(0, 7) }) })
-settingsBack.MouseEnter:Connect(function() tween(settingsBack, 0.12, { BackgroundTransparency = 0 }) end)
+settingsBack.MouseEnter:Connect(function()
+	tween(settingsBack, 0.12, { BackgroundTransparency = 0 })
+	if sfx then pcall(sfx, "hover") end
+end)
 settingsBack.MouseLeave:Connect(function() tween(settingsBack, 0.12, { BackgroundTransparency = 0.2 }) end)
+settingsBack.MouseButton1Click:Connect(function()
+	if sfx then pcall(sfx, "tap") end
+end)
 
 local settingsBody = new("Frame", {
 	Position = UDim2.fromOffset(0, 38), Size = UDim2.new(1, 0, 1, -38),
